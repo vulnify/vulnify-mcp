@@ -10,7 +10,7 @@ function fail(message) {
 }
 
 if (pkg.name !== '@vulnify/mcp') fail(`unexpected package name ${pkg.name}`);
-if (pkg.version !== '0.1.0') fail(`package.json version is ${pkg.version}, expected 0.1.0`);
+if (!/^\d+\.\d+\.\d+$/.test(pkg.version)) fail(`package.json version is ${pkg.version}`);
 if (pkg.mcpName !== 'io.vulnify/mcp') fail(`mcpName is ${pkg.mcpName}`);
 if (server.name !== pkg.mcpName) fail('server.json name must match package.json mcpName');
 if (server.version !== pkg.version) fail('server.json version must match package.json');

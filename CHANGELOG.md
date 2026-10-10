@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+docs: README refresh
+
+- README for GitHub and npm: what the server does, local and remote install, the tools table, the dry-run safety rule, the hosted IP allowlist, and product screenshots.
+- The package bin path is `dist/cli.js`. npm 11 rewrote `./dist/cli.js` on publish and warned that the script name was removed.
+
 ## 0.1.0
 
 First release of `@vulnify/mcp`.

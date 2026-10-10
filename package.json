@@ -1,6 +1,6 @@
 {
   "name": "@vulnify/mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Vulnify MCP server: runtime authorization for AI agents. Check an action, record a decision, and read policies.",
   "keywords": [
     "vulnify",
@@ -27,7 +27,7 @@
     "LICENSE"
   ],
   "bin": {
-    "vulnify-mcp": "./dist/cli.js"
+    "vulnify-mcp": "dist/cli.js"
   },
   "type": "module",
   "sideEffects": false,
