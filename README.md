@@ -63,6 +63,8 @@ Cursor (`.cursor/mcp.json`):
 
 ### Remote Streamable HTTP
 
+`https://mcp.vulnify.io/mcp` is not deployed yet. API-key IP allowlists are checked against the hosted server's egress IP when using that URL, not the end user's IP. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`) instead.
+
 ```json
 {
   "mcpServers": {
@@ -131,7 +133,7 @@ Credentials:
 
 Keys are not logged. Request logs are method, path, and status. `content` sent for a sensitive-data scan is forwarded to the API and is not written to this server's logs. The API scans that text in memory and does not store it.
 
-An API-key IP allowlist is checked by `api.vulnify.io` against the caller it sees. stdio runs on the user's machine, so the allowlist sees that machine. The hosted MCP server calls the API from its own egress address. A key allowlisted to an office IP will be refused through the hosted server unless that egress address is allowed too.
+API-key IP allowlists are checked against the hosted server's egress IP when using `https://mcp.vulnify.io/mcp`, not the end user's IP. The hosted process calls `api.vulnify.io` from its own address. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`) instead. stdio runs on the user's machine, so the allowlist sees that machine.
 
 This package does not run a shell, does not register hooks, and does not approve reviews. Do not put a key in a tool argument or in a committed config file.
 
