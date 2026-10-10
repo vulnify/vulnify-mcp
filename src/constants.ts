@@ -1,6 +1,20 @@
 export const VERSION = '0.1.3';
 export const SERVER_NAME = 'io.vulnify/mcp';
 export const SERVER_TITLE = 'Vulnify';
+export const WEBSITE_URL = 'https://www.vulnify.io';
+export const SERVER_ICONS = [
+  {
+    src: 'https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/assets/logo.svg',
+    mimeType: 'image/svg+xml',
+    sizes: ['any'],
+  },
+  {
+    src: 'https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/logo.png',
+    mimeType: 'image/png',
+    sizes: ['any'],
+  },
+] as const;
+export const DECISIONS_URI = 'vulnify://docs/decisions';
 export const DEFAULT_BASE_URL = 'https://api.vulnify.io';
 export const DEFAULT_PORT = 8080;
 /** Upper bound for get_decision's optional wait. Keeps one tool call inside typical client timeouts. */

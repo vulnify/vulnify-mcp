@@ -1,28 +1,16 @@
 # Remote Streamable HTTP server. Smithery does not build or host this process.
 # Publish a URL server: https://smithery.ai/docs/build/publish
 #   smithery mcp publish "https://mcp.vulnify.io/mcp" -n @vulnify/mcp
-# Header config for remote servers: https://smithery.ai/docs/build/session-config
-# Authorization is reserved for Smithery OAuth, so the API key uses X-Vulnify-Key.
-# The hosted server accepts that header as the raw Vulnify API key.
+# Clients sign in with OAuth. This config does not send a Vulnify API key.
 
 startCommand:
   type: http
   url: https://mcp.vulnify.io/mcp
   configSchema:
     type: object
-    required:
-      - vulnifyApiKey
-    properties:
-      vulnifyApiKey:
-        type: string
-        title: Vulnify API key
-        description: >-
-          Vulnify API key (vln_live_... or vln_test_...). Smithery forwards the
-          value as the X-Vulnify-Key header on each request to the hosted server.
-        x-from:
-          header: X-Vulnify-Key
+    properties: {}
 
 metadata:
-  homepage: https://docs.vulnify.io/mcp/
+  homepage: https://www.vulnify.io
   documentation: https://docs.vulnify.io/mcp/
   repository: https://github.com/vulnify/vulnify-mcp

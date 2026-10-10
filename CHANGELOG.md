@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Every tool publishes a loose output schema (`additionalProperties` allowed) and returns `structuredContent` for the stable fields. Input parameters include descriptions. `prompts/list` returns `guard_action` and `review_policies`. `resources/list` returns `vulnify://docs/decisions`. `serverInfo` includes `https://www.vulnify.io` and the logo icons. The server card lists the five OAuth tools, those prompts, and that resource. `smithery.yaml` does not require an API key.
+
 ## 0.1.3
 
 docs: finalDecision is the authoritative result
