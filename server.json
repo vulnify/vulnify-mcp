@@ -51,14 +51,14 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Vulnify API key as a Bearer token.",
-          "isRequired": true,
+          "description": "Optional Vulnify API key (vln_live_... or vln_test_...) as a Bearer token. Omit this header to sign in with OAuth.",
+          "isRequired": false,
           "isSecret": true,
           "value": "Bearer {api_key}",
           "variables": {
             "api_key": {
-              "description": "Vulnify API key (vln_live_... or vln_test_...).",
-              "isRequired": true,
+              "description": "Vulnify API key (vln_live_... or vln_test_...). Leave empty to use OAuth.",
+              "isRequired": false,
               "isSecret": true,
               "format": "string"
             }

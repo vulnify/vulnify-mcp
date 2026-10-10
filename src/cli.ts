@@ -11,7 +11,8 @@ stdio (default):  npx -y @vulnify/mcp
 
 HTTP:             vulnify-mcp --http
   Listens on PORT (default ${DEFAULT_PORT}) and HOST (default 0.0.0.0).
-  Clients send Authorization: Bearer <key> or X-Vulnify-Key: <key> on each request.
+  OAuth: Authorization: Bearer vln_oat_... (validated with OAUTH_INTROSPECTION_SECRET).
+  API key: Authorization: Bearer <key> or X-Vulnify-Key: <key> on each request.
   GET /health does not require a key.
 `;
 
@@ -39,7 +40,15 @@ async function main(): Promise<void> {
     if (!Number.isInteger(port) || port < 0 || port > 65535) fail('PORT must be an integer from 0 to 65535.');
     const host = process.env.HOST?.trim() || '0.0.0.0';
     if (/[\s/]/.test(host)) fail('HOST is not a valid bind address.');
-    await startHttpServer({ port, host, baseUrl });
+    if (!process.env.OAUTH_INTROSPECTION_SECRET?.trim()) {
+      process.stderr.write('OAUTH_INTROSPECTION_SECRET is not set. API keys work. OAuth user login cannot be validated.\n');
+    }
+    await startHttpServer({
+      port,
+      host,
+      baseUrl,
+      introspectionSecret: process.env.OAUTH_INTROSPECTION_SECRET,
+    });
     process.stderr.write(`vulnify-mcp listening on ${host}:${port}\n`);
     return;
   }

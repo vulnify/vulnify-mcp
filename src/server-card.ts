@@ -2,15 +2,15 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { VulnifyClient } from './api.js';
-import { DEFAULT_BASE_URL, SERVER_NAME, SERVER_TITLE, VERSION } from './constants.js';
+import { DEFAULT_BASE_URL, PROTECTED_RESOURCE_METADATA_URL, SERVER_NAME, SERVER_TITLE, VERSION } from './constants.js';
 import { createVulnifyServer } from './server.js';
 
 export const DOCS_URL = 'https://docs.vulnify.io/mcp/';
 export const REPOSITORY_URL = 'https://github.com/vulnify/vulnify-mcp';
 export const MCP_URL = 'https://mcp.vulnify.io/mcp';
 
-const API_KEY_HEADER =
-  'A Vulnify API key is required on every MCP request. Send it in the Authorization header as "Bearer <key>", or in the X-Vulnify-Key header.';
+const AUTH_DESCRIPTION =
+  'Sign in with OAuth 2.1, or send a Vulnify API key in the Authorization header as "Bearer <key>", or in the X-Vulnify-Key header.';
 
 export interface ServerCardTool {
   name: string;
@@ -41,7 +41,8 @@ export interface ServerCard {
   };
   authentication: {
     required: true;
-    schemes: ['bearer', 'x-vulnify-key'];
+    schemes: ['oauth2', 'bearer', 'x-vulnify-key'];
+    resourceMetadata: string;
     description: string;
   };
   tools: ServerCardTool[];
@@ -108,8 +109,9 @@ export async function buildServerCard(): Promise<ServerCard> {
     },
     authentication: {
       required: true,
-      schemes: ['bearer', 'x-vulnify-key'],
-      description: API_KEY_HEADER,
+      schemes: ['oauth2', 'bearer', 'x-vulnify-key'],
+      resourceMetadata: PROTECTED_RESOURCE_METADATA_URL,
+      description: AUTH_DESCRIPTION,
     },
     tools,
     resources: [],
