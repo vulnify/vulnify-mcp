@@ -3,9 +3,10 @@ import express, { type ErrorRequestHandler, type Express, type NextFunction, typ
 import type { Server } from 'node:http';
 import { readApiKey } from './auth.js';
 import { VulnifyClient } from './api.js';
-import { DEFAULT_PORT, SERVER_NAME, SERVER_TITLE, VERSION } from './constants.js';
+import { DEFAULT_PORT, VERSION } from './constants.js';
 import { redact } from './redact.js';
 import { createVulnifyServer } from './server.js';
+import { serverCard } from './server-card.js';
 
 export type Logger = (line: string) => void;
 
@@ -29,24 +30,6 @@ function defaultLogger(line: string): void {
 function unauthorized(res: Response, message: string): void {
   res.setHeader('WWW-Authenticate', UNAUTHORIZED_HEADER);
   res.status(401).json({ error: 'unauthorized', message });
-}
-
-function serverCard() {
-  return {
-    serverInfo: {
-      name: SERVER_NAME,
-      title: SERVER_TITLE,
-      version: VERSION,
-    },
-    transport: {
-      type: 'streamable-http',
-      url: 'https://mcp.vulnify.io/mcp',
-    },
-    authentication: {
-      required: true,
-      schemes: ['bearer', 'x-vulnify-key'],
-    },
-  };
 }
 
 const jsonTooLarge: ErrorRequestHandler = (err: { type?: string; status?: number }, _req, res, next: NextFunction) => {
@@ -87,8 +70,15 @@ export function createHttpApp(options: HttpAppOptions): Express {
     res.status(200).json({ ok: true, service: 'vulnify-mcp', version: VERSION });
   });
 
-  app.get('/.well-known/mcp/server-card.json', (_req, res) => {
-    res.status(200).json(serverCard());
+  app.get('/.well-known/mcp/server-card.json', async (_req, res) => {
+    try {
+      res.status(200).json(await serverCard());
+    } catch (err) {
+      logger(`server card: ${redact(err instanceof Error ? err.name : 'error')}`);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'internal_error', message: 'The server card could not be built.' });
+      }
+    }
   });
 
   app.use(express.json({ limit: '256kb' }));

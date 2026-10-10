@@ -180,6 +180,12 @@ curl -sS -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/mcp \
 
 The health check prints JSON. The POST without a key prints `401`.
 
+`GET /.well-known/mcp/server-card.json` does not require a key. It lists the tools the server registers (names, descriptions, and input schemas), states that a Vulnify API key is required in a header, and links to the docs and this repository.
+
+```bash
+curl -sS https://mcp.vulnify.io/.well-known/mcp/server-card.json
+```
+
 ## Errors
 
 Tool failures are MCP tool errors (`isError`). The API key is not included.

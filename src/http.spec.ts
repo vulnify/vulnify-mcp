@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, it } from 'node:test';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -7,6 +8,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { readApiKey } from './auth.js';
 import { startHttpServer } from './http.js';
 import { redact } from './redact.js';
+import type { ServerCard } from './server-card.js';
 
 const KEY = 'vln_test_http_header_key';
 const OTHER = 'vln_live_other_header_key';
@@ -86,6 +88,47 @@ describe('HTTP server', () => {
     assert.equal(cardBody.transport.url, 'https://mcp.vulnify.io/mcp');
   });
 
+  it('publishes the registered tools, header auth, and links on the server card', async () => {
+    const base = await listen();
+    const card = await fetch(`${base}/.well-known/mcp/server-card.json`);
+    assert.equal(card.status, 200);
+    const cardBody = (await card.json()) as ServerCard;
+
+    const transport = new StreamableHTTPClientTransport(new URL(`${base}/mcp`), {
+      requestInit: { headers: { Authorization: `Bearer ${KEY}` } },
+    });
+    const client = new Client({ name: 'card-test', version: '0.0.0' });
+    await client.connect(transport);
+    const listed = await client.listTools();
+    await client.close();
+    await transport.close();
+
+    assert.equal(listed.tools.length, 7);
+    assert.deepEqual(
+      cardBody.tools,
+      listed.tools.map((tool) => ({
+        name: tool.name,
+        title: tool.title,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+      })),
+    );
+    for (const tool of cardBody.tools) {
+      assert.equal(typeof tool.description, 'string');
+      assert.equal(tool.inputSchema.type, 'object');
+    }
+
+    assert.equal(cardBody.authentication.required, true);
+    assert.deepEqual(cardBody.authentication.schemes, ['bearer', 'x-vulnify-key']);
+    assert.match(cardBody.authentication.description, /Vulnify API key/);
+    assert.match(cardBody.authentication.description, /Authorization header/);
+    assert.match(cardBody.authentication.description, /X-Vulnify-Key/);
+    assert.equal(cardBody.links.documentation, 'https://docs.vulnify.io/mcp/');
+    assert.equal(cardBody.links.repository, 'https://github.com/vulnify/vulnify-mcp');
+    assert.equal(cardBody.websiteUrl, 'https://docs.vulnify.io/mcp/');
+    assert.equal(cardBody.repository.url, 'https://github.com/vulnify/vulnify-mcp');
+  });
+
   it('returns 401 for an unauthenticated MCP request', async () => {
     let called = false;
     const base = await listen(async () => {
@@ -157,5 +200,16 @@ describe('HTTP server', () => {
     const logText = logs.join('\n');
     assert.equal(logText.includes(KEY), false);
     assert.equal(logText.includes(OTHER), false);
+  });
+});
+
+describe('smithery.yaml', () => {
+  it('points Smithery at the hosted HTTP server and the API-key header', () => {
+    const yaml = readFileSync(new URL('../smithery.yaml', import.meta.url), 'utf8');
+    assert.match(yaml, /type:\s*http/);
+    assert.match(yaml, /url:\s*https:\/\/mcp\.vulnify\.io\/mcp/);
+    assert.match(yaml, /header:\s*X-Vulnify-Key/);
+    assert.match(yaml, /https:\/\/docs\.vulnify\.io\/mcp\//);
+    assert.match(yaml, /https:\/\/github\.com\/vulnify\/vulnify-mcp/);
   });
 });
