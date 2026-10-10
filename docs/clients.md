@@ -113,7 +113,7 @@ if (decision.finalDecision !== 'ALLOW') {
 }
 ```
 
-Obey `finalDecision`. `REVIEW` and `BLOCK` mean the export does not run. The SDK records that call (`POST /v1/events`), the same as `decide_action`. For a dry run that records nothing, use this MCP server's `check_action` or the CLI `vulnify test`. Full SDK documentation is at https://docs.vulnify.io.
+The `finalDecision` field is the authoritative result. `REVIEW` and `BLOCK` mean the export was not allowed. The SDK records that call (`POST /v1/events`), the same as `decide_action`. For a dry run that records nothing, use this MCP server's `check_action` or the CLI `vulnify test`. Full SDK documentation is at https://docs.vulnify.io.
 
 If the SDK cannot reach Vulnify, the default is a fail-closed decision, not a thrown tool error. The MCP server returns an error instead, so an agent does not read a fallback as `ALLOW`.
 

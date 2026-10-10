@@ -104,7 +104,7 @@ A `vln_oat_...` access token is checked with `POST /oauth/introspect`, then sent
   <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/how-it-works.svg" alt="An agent action goes to Vulnify. finalDecision is ALLOW (the action may run), REVIEW (a person decides), or BLOCK (the action does not run)." width="720" />
 </p>
 
-Obey `finalDecision`. A tool error is not an `ALLOW`.
+The `finalDecision` field is the authoritative result. A tool error is not an `ALLOW`.
 
 ## Tools
 
@@ -113,14 +113,14 @@ Every tool has a title and `readOnlyHint`, `destructiveHint`, `idempotentHint`, 
 | Tool | API | Records? | readOnlyHint | Notes |
 | --- | --- | --- | --- | --- |
 | `check_action` | `POST /v1/policies/test` (one case) | No | true | Skips the PII scan and records nothing. No event id. |
-| `decide_action` | `POST /v1/events` | Yes | false | Writes a security event and an audit entry. Obey `finalDecision`. |
+| `decide_action` | `POST /v1/events` | Yes | false | Writes a security event and an audit entry. `finalDecision` is the authoritative result. |
 | `get_decision` | `GET /v1/events/{id}` | No | true | Reads a decision. Optional wait polls a `REVIEW` until `ALLOW` or `BLOCK` (30 seconds max). |
 | `list_policies` | `GET /v1/policies` | No | true | Policies as code, sorted by name. |
 | `test_policies` | `POST /v1/policies/test` | No | true | Up to 200 cases. Skips the PII scan. Proposed `policies` are not saved. |
 | `plan_policy_changes` | `POST /v1/policies/apply` | No | true | `dryRun` is forced to true. Needs an org-wide LIVE key. |
 | `check_mcp_tool_call` | `POST /v1/gateway/mcp` | Yes | false | Maps a tool name to an action and records the decision. Does not run the tool. |
 
-`destructiveHint` is false on every tool. `openWorldHint` is true on every tool, because each call reads or writes organization state at the Vulnify API. `idempotentHint` is true for the read-only tools and false for `decide_action` and `check_mcp_tool_call`. Pass `idempotencyKey` so a retry does not record a second event.
+`destructiveHint` is false on every tool. `openWorldHint` is true on every tool, because each call reaches the Vulnify API rather than only local data. `idempotentHint` is true for the read-only tools and false for `decide_action` and `check_mcp_tool_call`. An `idempotencyKey` makes a retry of a recorded decision return the same event.
 
 Policy list, test, and plan calls are limited to 60 requests per minute per key. Batch dry runs with `test_policies`. `POST /v1/events` has its own limit. The OpenAPI text says only that the limit was exceeded.
 

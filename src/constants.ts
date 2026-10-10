@@ -36,10 +36,10 @@ export const PROTECTED_RESOURCE_METADATA = {
 } as const;
 
 export const INSTRUCTIONS = [
-  'Vulnify is a runtime authorization layer. Obey finalDecision: ALLOW, REVIEW, or BLOCK.',
+  'Vulnify is a runtime authorization layer. The finalDecision field is the authoritative result: ALLOW, REVIEW, or BLOCK.',
   'check_action previews a decision. It skips the PII scan and records nothing.',
-  'decide_action and check_mcp_tool_call record a real decision. Do not use them for a what-if question.',
-  'REVIEW means a human must decide. This server cannot approve or deny a review.',
-  'When finalDecision is REVIEW, poll get_decision until it is ALLOW or BLOCK before acting.',
-  'A tool error is not an ALLOW. Do not run the action.',
+  'decide_action and check_mcp_tool_call record a decision. check_action is the preview and records nothing.',
+  'REVIEW means a human decides. This server cannot approve or deny a review.',
+  'When finalDecision is REVIEW, get_decision can poll until it is ALLOW or BLOCK.',
+  'A tool error does not include finalDecision. finalDecision is present on a successful decision.',
 ].join(' ');

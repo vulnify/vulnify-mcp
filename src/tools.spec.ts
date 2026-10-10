@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildPlanBody, VulnifyClient } from './api.js';
-import { DEFAULT_BASE_URL, VERSION } from './constants.js';
+import { DEFAULT_BASE_URL, INSTRUCTIONS, VERSION } from './constants.js';
 import { createVulnifyServer } from './server.js';
 import { readFileSync } from 'node:fs';
 
@@ -125,7 +125,11 @@ describe('tools', () => {
         assert.equal(tool.annotations?.destructiveHint, false);
         assert.equal(tool.annotations?.idempotentHint, hint.idempotent);
         assert.equal(tool.annotations?.openWorldHint, true);
+        assert.doesNotMatch(tool.description ?? '', /obey/i);
+        assert.doesNotMatch(tool.description ?? '', /do not run/i);
       }
+      assert.doesNotMatch(INSTRUCTIONS, /obey/i);
+      assert.doesNotMatch(INSTRUCTIONS, /do not run/i);
       const plan = byName.get('plan_policy_changes');
       assert.equal(plan?.inputSchema.properties?.dryRun, undefined);
       assert.match(byName.get('check_action')?.description ?? '', /skips the PII scan/);
