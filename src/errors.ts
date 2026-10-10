@@ -12,6 +12,46 @@ export class VulnifyApiError extends Error {
   }
 }
 
+const COMMERCE_URL = /https?:\/\/[^\s)\]"'<>]+/gi;
+const COMMERCE_HINT = /checkout|upgrade|billing|pricing|subscribe|payment|\bplans?\b/i;
+const COMMERCE_KEY = /^(checkout|upgrade|billing|pricing|subscribe|payment)(url|uri|link|href)?$/i;
+
+function isCommerceLink(url: string): boolean {
+  const trimmed = url.trim().replace(/[),.;]+$/g, '');
+  try {
+    const parsed = new URL(trimmed);
+    return COMMERCE_HINT.test(`${parsed.hostname}${parsed.pathname}${parsed.search}`);
+  } catch {
+    return COMMERCE_HINT.test(trimmed);
+  }
+}
+
+/** Removes checkout, upgrade, billing, and pricing links from text returned to a model. */
+export function stripCommerceLinks(value: string): string {
+  const withoutMarkdown = value.replace(/\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/gi, (match, url: string) =>
+    isCommerceLink(url) ? '' : match,
+  );
+  return withoutMarkdown
+    .replace(COMMERCE_URL, (url) => (isCommerceLink(url) ? '' : url))
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\s+([.,;])/g, '$1')
+    .trim();
+}
+
+/** Drops commerce links from a tool payload, including a field whose value is only that link. */
+export function sanitizeToolPayload(value: unknown): unknown {
+  if (typeof value === 'string') return stripCommerceLinks(value);
+  if (Array.isArray(value)) return value.map((item) => sanitizeToolPayload(item));
+  if (!value || typeof value !== 'object') return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    if (COMMERCE_KEY.test(key)) continue;
+    if (typeof item === 'string' && isCommerceLink(item)) continue;
+    out[key] = sanitizeToolPayload(item);
+  }
+  return out;
+}
+
 function messageOf(body: unknown): string {
   if (!body || typeof body !== 'object') return '';
   const record = body as { message?: unknown; error?: unknown };
@@ -51,8 +91,8 @@ function rateLimitMessage(path: string): string {
  * 401, 403, 413, and 429 are mapped explicitly.
  */
 export function formatApiError(status: number, body: unknown, path: string): string {
-  const apiMessage = redact(messageOf(body));
-  const fields = redact(fieldsOf(body));
+  const apiMessage = stripCommerceLinks(redact(messageOf(body)));
+  const fields = stripCommerceLinks(redact(fieldsOf(body)));
 
   switch (status) {
     case 401:
@@ -62,7 +102,7 @@ export function formatApiError(status: number, body: unknown, path: string): str
       return 'Vulnify rejected the API key (401). It is missing, invalid, revoked, or expired.';
     case 403:
       if (path.startsWith('/v1/mcp/')) {
-        const description = redact(errorDescription(body) || apiMessage);
+        const description = stripCommerceLinks(redact(errorDescription(body) || apiMessage));
         return `Vulnify refused this call (403). ${description || 'The access token cannot perform this action.'}`;
       }
       if (apiMessage.includes('org-wide LIVE')) {

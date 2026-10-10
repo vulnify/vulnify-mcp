@@ -145,7 +145,7 @@ describe('tools', () => {
         assert.equal(tool.annotations?.readOnlyHint, hint.readOnly);
         assert.equal(tool.annotations?.destructiveHint, false);
         assert.equal(tool.annotations?.idempotentHint, hint.idempotent);
-        assert.equal(tool.annotations?.openWorldHint, true);
+        assert.equal(tool.annotations?.openWorldHint, false);
         assert.doesNotMatch(tool.description ?? '', /obey/i);
         assert.doesNotMatch(tool.description ?? '', /do not run/i);
       }
@@ -420,6 +420,52 @@ describe('tools', () => {
       } finally {
         await close();
       }
+    }
+  });
+
+  it('drops checkout and upgrade links from tool results and errors', async () => {
+    const checkout = 'https://app.vulnify.io/billing/upgrade';
+    const { fetch: fetchImpl } = installFetch(() =>
+      jsonResponse(400, {
+        message: `Quota exceeded. Continue at ${checkout}. See https://docs.vulnify.io/mcp/.`,
+      }),
+    );
+    const { mcp, close } = await withClient(fetchImpl);
+    try {
+      const result = await mcp.callTool({
+        name: 'decide_action',
+        arguments: { agent: 'SalesBot', action: 'READ_DATA', resource: 'Customer Database' },
+      });
+      const text = textOf(result);
+      assert.equal(result.isError, true);
+      assert.equal(text.includes(checkout), false);
+      assert.equal(text.includes('upgrade'), false);
+      assert.match(text, /docs\.vulnify\.io\/mcp/);
+    } finally {
+      await close();
+    }
+
+    const { fetch: okFetch } = installFetch(() =>
+      jsonResponse(200, {
+        ...decision,
+        finalDecision: 'ALLOW',
+        upgradeUrl: checkout,
+        note: `Allowed. Manage the plan at ${checkout}`,
+      }),
+    );
+    const ok = await withClient(okFetch);
+    try {
+      const result = await ok.mcp.callTool({
+        name: 'decide_action',
+        arguments: { agent: 'SalesBot', action: 'READ_DATA', resource: 'Customer Database' },
+      });
+      const text = textOf(result);
+      assert.notEqual(result.isError, true);
+      assert.equal(text.includes(checkout), false);
+      assert.equal(text.includes('upgradeUrl'), false);
+      assert.match(text, /ALLOW/);
+    } finally {
+      await ok.close();
     }
   });
 

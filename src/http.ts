@@ -18,6 +18,8 @@ export interface HttpAppOptions {
   logger?: Logger;
   /** Bearer secret for POST /oauth/introspect. Required for `vln_oat_...` tokens. API keys work without it. */
   introspectionSecret?: string;
+  /** Domain check for the OpenAI app directory. Served at `/.well-known/openai-apps-challenge`. */
+  openaiAppsChallenge?: string;
   /** Clock for the introspection cache. Tests inject this. */
   now?: () => number;
 }
@@ -25,6 +27,12 @@ export interface HttpAppOptions {
 export interface ListenOptions extends HttpAppOptions {
   port?: number;
   host?: string;
+}
+
+function challengeToken(value: string | undefined): string | undefined {
+  const token = value?.trim() ?? '';
+  if (!token || token.length > 512 || /\s/.test(token)) return undefined;
+  return token;
 }
 
 function defaultLogger(line: string): void {
@@ -107,6 +115,17 @@ export function createHttpApp(options: HttpAppOptions): Express {
   });
   app.get('/.well-known/oauth-protected-resource/mcp', (_req, res) => {
     sendProtectedResource(res);
+  });
+
+  app.get('/.well-known/openai-apps-challenge', (_req, res) => {
+    const token = challengeToken(options.openaiAppsChallenge);
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('text/plain; charset=utf-8');
+    if (!token) {
+      res.status(404).send('Not found.');
+      return;
+    }
+    res.status(200).send(token);
   });
 
   app.use(express.json({ limit: '256kb' }));

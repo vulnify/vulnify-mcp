@@ -6,7 +6,8 @@
 - An OAuth `tools/list` returns `check_action`, `decide_action`, `get_decision`, `list_policies`, and `test_policies`. The 401 challenge includes `scope="decisions:read decisions:write policies:read policies:test"`. Protected-resource metadata on `mcp.vulnify.io` lists those four scopes.
 - The Cursor plugin connects to `https://mcp.vulnify.io/mcp` and signs in with Vulnify. Plugin version 0.1.3. The server card includes tool annotations.
 - A `vln_ort_...` refresh token, a `vln_oac_...` credential, or any other unrecognized secret is rejected with 401 and `WWW-Authenticate` (`error="invalid_token"`) before `initialize` or `tools/list`. API keys are checked with `GET /v1/policies` on first use. A successful check is cached for at most 60 seconds under a hash of the key. A key the API rejects returns that same 401.
-- Tool descriptions state that `finalDecision` is the authoritative result. Every tool keeps its title, `readOnlyHint`, and `destructiveHint`. `openWorldHint` is true because each tool calls the Vulnify API.
+- Tool descriptions state that `finalDecision` is the authoritative result. Every tool keeps its title, `readOnlyHint`, and `destructiveHint`. `openWorldHint` is false because each tool stays inside the caller's own Vulnify organization.
+- `GET /.well-known/openai-apps-challenge` returns `OPENAI_APPS_CHALLENGE` as `text/plain`, or 404 when that variable is unset. Tool results and errors omit checkout and upgrade links.
 
 ## 0.1.2
 
