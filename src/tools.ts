@@ -184,6 +184,8 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
       }),
   );
 
+  if (!client.usesApiKey()) return;
+
   server.registerTool(
     'plan_policy_changes',
     {

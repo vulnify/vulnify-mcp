@@ -43,9 +43,50 @@ Application code that should decide inside your own process uses the [Node SDK](
 
 ## Quickstart
 
-Node.js 20 or newer. Use a dedicated **TEST** key (`vln_test_...`) to try a client. The hosted guide is [docs.vulnify.io/mcp](https://docs.vulnify.io/mcp/). Client snippets for Cursor, Claude Code, Claude Desktop, and VS Code are in [docs/clients.md](docs/clients.md).
+The hosted guide is [docs.vulnify.io/mcp](https://docs.vulnify.io/mcp/). Client snippets for Cursor, Claude Code, Claude Desktop, and VS Code are in [docs/clients.md](docs/clients.md).
+
+### Hosted server
+
+[`https://mcp.vulnify.io/mcp`](https://mcp.vulnify.io/mcp) keeps no session. Sign in with Vulnify.
+
+Claude custom connector: add `https://mcp.vulnify.io/mcp`. Claude follows the 401 challenge, opens Vulnify sign-in, and stops on the consent page until you allow access. The steps are in [docs/clients.md](docs/clients.md#claude-custom-connector).
+
+Cursor: [Install Vulnify](cursor://anysphere.cursor-deeplink/mcp/install?name=vulnify&config=eyJ1cmwiOiJodHRwczovL21jcC52dWxuaWZ5LmlvL21jcCJ9).
+
+An OAuth session lists `check_action`, `decide_action`, `get_decision`, `list_policies`, and `test_policies`.
+
+### API key
+
+A manual config can still send an API key on every request. Use a dedicated **TEST** key (`vln_test_...`). This works for Cursor, Claude Code, VS Code, and any client that can set a header:
+
+```json
+{
+  "mcpServers": {
+    "vulnify": {
+      "url": "https://mcp.vulnify.io/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:VULNIFY_API_KEY}"
+      }
+    }
+  }
+}
+```
+
+`X-Vulnify-Key: <key>` is accepted for `vln_live_...` and `vln_test_...` keys. A request with no credentials gets **401** and:
+
+```
+WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"
+```
+
+`GET /health` does not require a key. `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-protected-resource/mcp` return the protected-resource document (resource `https://mcp.vulnify.io/mcp`, authorization server `https://api.vulnify.io`, the four scopes above, bearer header). Responses are JSON.
+
+A `vln_oat_...` access token is checked with `POST /oauth/introspect`, then sent to `/v1/mcp/*`. `check_action` and `test_policies` need `policies:test`. `decide_action` needs `decisions:write`. `get_decision` needs `decisions:read`. `list_policies` needs `policies:read`. `plan_policy_changes` and `check_mcp_tool_call` stay on API-key and stdio sessions: an OAuth `tools/list` does not include them, because the API has no `/v1/mcp` route for policy apply or the MCP gateway. There is no approve tool and no deny tool.
+
+A `vln_ort_...` refresh token, a `vln_oac_...` credential, or any other unrecognized secret receives **401** and `WWW-Authenticate` with `error="invalid_token"`. A `vln_live_...` or `vln_test_...` key is checked with `GET /v1/policies` before `initialize` and `tools/list`. A key the API rejects receives that same 401. A successful check is reused for at most 60 seconds. The cache key is a hash of the API key.
 
 ### Local stdio
+
+Node.js 20 or newer.
 
 ```bash
 npx -y @vulnify/mcp
@@ -66,39 +107,6 @@ Cursor (`.cursor/mcp.json`):
   }
 }
 ```
-
-### Remote Streamable HTTP
-
-[`https://mcp.vulnify.io/mcp`](https://mcp.vulnify.io/mcp) is the hosted server. It keeps no session. Sign in with OAuth, or send an API key on every request.
-
-A Claude custom connector uses the URL only. Do not send a key. Claude follows the 401 challenge, opens Vulnify sign-in, and stops on the consent page until you allow access. The steps are in [docs/clients.md](docs/clients.md#claude-custom-connector).
-
-An API key still works for Cursor, Claude Code, VS Code, and any client that can set a header:
-
-```json
-{
-  "mcpServers": {
-    "vulnify": {
-      "url": "https://mcp.vulnify.io/mcp",
-      "headers": {
-        "Authorization": "Bearer ${env:VULNIFY_API_KEY}"
-      }
-    }
-  }
-}
-```
-
-`X-Vulnify-Key: <key>` is accepted for `vln_live_...` and `vln_test_...` keys. A request with no credentials gets **401** and:
-
-```
-WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp"
-```
-
-`GET /health` does not require a key. `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-protected-resource/mcp` return the protected-resource document (resource `https://mcp.vulnify.io/mcp`, authorization server `https://api.vulnify.io`, bearer header). Responses are JSON.
-
-A `vln_oat_...` access token is checked with `POST /oauth/introspect`, then sent to `/v1/mcp/*`. `check_action` and `test_policies` need `policies:test`. `decide_action` needs `decisions:write`. `get_decision` needs `decisions:read`. `list_policies` needs `policies:read`. `plan_policy_changes` and `check_mcp_tool_call` stay API-key only: the API has no `/v1/mcp` route for policy apply or the MCP gateway. There is no approve tool and no deny tool.
-
-A `vln_ort_...` refresh token, a `vln_oac_...` credential, or any other unrecognized secret receives **401** and `WWW-Authenticate` with `error="invalid_token"`. A `vln_live_...` or `vln_test_...` key is checked with `GET /v1/policies` before `initialize` and `tools/list`. A key the API rejects receives that same 401. A successful check is reused for at most 60 seconds. The cache key is a hash of the API key.
 
 ## How it works
 
@@ -134,7 +142,7 @@ This server cannot change a review and cannot save a policy.
 - There is no apply tool. `plan_policy_changes` calls `POST /v1/policies/apply` with `dryRun: true` on every request. The tool input has no `dryRun` field. The server sets `dryRun` last, so a caller cannot turn the dry run off. The tool returns the diff.
 - `POST /v1/gateway/http` is not a tool. On `ALLOW`, that API endpoint forwards the HTTP call. This server does not.
 
-`plan_policy_changes` needs an org-wide LIVE key. A TEST key or an agent-bound key gets 403. An OAuth access token cannot call `plan_policy_changes` or `check_mcp_tool_call`.
+`plan_policy_changes` needs an org-wide LIVE key. A TEST key or an agent-bound key gets 403. An OAuth session does not list `plan_policy_changes` or `check_mcp_tool_call`.
 
 ## OAuth scopes
 
@@ -147,8 +155,8 @@ User login is the hosted HTTP server. The local stdio process still uses an API 
 | `decide_action` | `decisions:write` | `POST /v1/mcp/events` |
 | `get_decision` | `decisions:read` | `GET /v1/mcp/events/{id}` |
 | `list_policies` | `policies:read` | `GET /v1/mcp/policies` |
-| `plan_policy_changes` | API key only | No `/v1/mcp` route |
-| `check_mcp_tool_call` | API key only | No `/v1/mcp` route for the gateway |
+| `plan_policy_changes` | API key and stdio only | Omitted from OAuth `tools/list` |
+| `check_mcp_tool_call` | API key and stdio only | Omitted from OAuth `tools/list` |
 
 A token that is missing the scope gets a tool error that names the scope. That error is not an `ALLOW`. Active introspection results are reused for at most 60 seconds, and never past `exp`.
 

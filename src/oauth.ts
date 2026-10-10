@@ -1,4 +1,10 @@
-import { INTROSPECTION_CACHE_MS, MCP_RESOURCE, PROTECTED_RESOURCE_METADATA_URL, REQUEST_TIMEOUT_MS } from './constants.js';
+import {
+  INTROSPECTION_CACHE_MS,
+  MCP_OAUTH_SCOPE,
+  MCP_RESOURCE,
+  PROTECTED_RESOURCE_METADATA_URL,
+  REQUEST_TIMEOUT_MS,
+} from './constants.js';
 
 const CACHE_LIMIT = 1024;
 
@@ -101,7 +107,7 @@ export class TokenIntrospector {
 }
 
 export function wwwAuthenticate(error?: 'invalid_token' | 'invalid_request'): string {
-  const header = `Bearer realm="${MCP_RESOURCE}", resource_metadata="${PROTECTED_RESOURCE_METADATA_URL}"`;
+  const header = `Bearer realm="${MCP_RESOURCE}", resource_metadata="${PROTECTED_RESOURCE_METADATA_URL}", scope="${MCP_OAUTH_SCOPE}"`;
   return error ? `${header}, error="${error}"` : header;
 }
 
