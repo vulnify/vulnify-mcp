@@ -201,7 +201,7 @@ Tool failures are MCP tool errors (`isError`). The API key is not included.
 
 ## Security
 
-Report a vulnerability through [GitHub private vulnerability reporting](https://github.com/vulnify/vulnify-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
+Report a vulnerability to [security@vulnify.io](mailto:security@vulnify.io). The disclosure policy is at [vulnify.io/disclosure](https://www.vulnify.io/disclosure). See [SECURITY.md](SECURITY.md).
 
 Keys are not logged. Request logs are method, path, and status. `content` sent for a sensitive-data scan is forwarded to the API and is not written to this server's logs. The API scans that text in memory and does not store it.
 
