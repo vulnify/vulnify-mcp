@@ -198,28 +198,40 @@ describe('HTTP server', () => {
     const client = new Client({ name: 'card-test', version: '0.0.0' });
     await client.connect(transport);
     const listed = await client.listTools();
-    await client.close();
-    await transport.close();
 
-    assert.equal(listed.tools.length, 7);
     assert.deepEqual(
-      cardBody.tools,
-      listed.tools.map((tool) => ({
-        name: tool.name,
-        title: tool.title,
-        description: tool.description,
-        inputSchema: tool.inputSchema,
-        annotations: tool.annotations,
-      })),
+      listed.tools.map((tool) => tool.name).sort(),
+      ['check_action', 'check_mcp_tool_call', 'decide_action', 'get_decision', 'list_policies', 'plan_policy_changes', 'test_policies'],
+    );
+    assert.deepEqual(
+      cardBody.tools.map((tool) => tool.name).sort(),
+      ['check_action', 'decide_action', 'get_decision', 'list_policies', 'test_policies'],
     );
     for (const tool of cardBody.tools) {
       assert.equal(typeof tool.description, 'string');
       assert.equal(tool.inputSchema.type, 'object');
+      assert.ok(tool.outputSchema);
+      assert.notEqual(tool.outputSchema.additionalProperties, false);
       assert.equal(typeof tool.annotations?.readOnlyHint, 'boolean');
       assert.equal(tool.annotations?.destructiveHint, false);
       assert.equal(tool.annotations?.openWorldHint, false);
       assert.equal(typeof tool.annotations?.idempotentHint, 'boolean');
     }
+    assert.deepEqual(
+      cardBody.prompts.map((prompt) => prompt.name).sort(),
+      ['guard_action', 'review_policies'],
+    );
+    assert.equal(cardBody.resources[0]?.uri, 'vulnify://docs/decisions');
+    assert.equal(cardBody.serverInfo.websiteUrl, 'https://www.vulnify.io');
+    assert.equal(cardBody.serverInfo.icons.length, 2);
+    const prompts = await client.listPrompts();
+    const resources = await client.listResources();
+    assert.deepEqual(
+      prompts.prompts.map((prompt) => prompt.name).sort(),
+      ['guard_action', 'review_policies'],
+    );
+    assert.equal(resources.resources[0]?.uri, 'vulnify://docs/decisions');
+    assert.equal(client.getServerVersion()?.websiteUrl, 'https://www.vulnify.io');
 
     assert.equal(cardBody.authentication.required, true);
     assert.deepEqual(cardBody.authentication.schemes, ['oauth2', 'bearer', 'x-vulnify-key']);
@@ -232,6 +244,8 @@ describe('HTTP server', () => {
     assert.equal(cardBody.links.repository, 'https://github.com/vulnify/vulnify-mcp');
     assert.equal(cardBody.websiteUrl, 'https://docs.vulnify.io/mcp/');
     assert.equal(cardBody.repository.url, 'https://github.com/vulnify/vulnify-mcp');
+    await client.close();
+    await transport.close();
   });
 
   it('returns 401 for an unauthenticated MCP request', async () => {
@@ -427,7 +441,30 @@ describe('HTTP server', () => {
           });
         }
         calls.push({ url, authorization });
-        if (url.endsWith('/v1/mcp/events/evt_1')) return jsonResponse({ id: 'evt_1', finalDecision: 'ALLOW' });
+        if (url.endsWith('/v1/mcp/policies/test')) {
+          return jsonResponse({
+            results: [
+              {
+                name: 'case',
+                decision: 'ALLOW',
+                matchedPolicy: null,
+                riskScore: 0,
+                riskLevel: 'LOW',
+                reasons: [],
+                pass: null,
+              },
+            ],
+          });
+        }
+        if (url.endsWith('/v1/mcp/events/evt_1') || url.endsWith('/v1/mcp/events')) {
+          return jsonResponse({
+            id: url.endsWith('/v1/mcp/events/evt_1') ? 'evt_1' : 'evt_recorded',
+            decision: 'ALLOW',
+            finalDecision: 'ALLOW',
+            policy: null,
+            review: null,
+          });
+        }
         return jsonResponse({ apiVersion: 'vulnify.io/v1', policies: [] });
       },
     });
@@ -642,12 +679,14 @@ describe('cursor plugin', () => {
 });
 
 describe('smithery.yaml', () => {
-  it('points Smithery at the hosted HTTP server and the API-key header', () => {
+  it('points Smithery at the hosted HTTP server and signs in with OAuth', () => {
     const yaml = readFileSync(new URL('../smithery.yaml', import.meta.url), 'utf8');
     assert.match(yaml, /type:\s*http/);
     assert.match(yaml, /url:\s*https:\/\/mcp\.vulnify\.io\/mcp/);
-    assert.match(yaml, /header:\s*X-Vulnify-Key/);
-    assert.match(yaml, /https:\/\/docs\.vulnify\.io\/mcp\//);
+    assert.doesNotMatch(yaml, /vulnifyApiKey/);
+    assert.doesNotMatch(yaml, /X-Vulnify-Key/);
+    assert.match(yaml, /homepage:\s*https:\/\/www\.vulnify\.io\b/);
+    assert.match(yaml, /documentation:\s*https:\/\/docs\.vulnify\.io\/mcp\//);
     assert.match(yaml, /https:\/\/github\.com\/vulnify\/vulnify-mcp/);
   });
 });

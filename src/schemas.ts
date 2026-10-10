@@ -1,9 +1,13 @@
 import { z } from 'zod';
 import { DEFAULT_POLL_MS, MAX_WAIT_MS, MIN_POLL_MS } from './constants.js';
 
-export const eventActionSchema = z.enum(['READ_DATA', 'WRITE_DATA', 'DELETE_DATA', 'EXPORT_DATA', 'SEND_EMAIL']);
-export const eventDestinationSchema = z.enum(['INTERNAL', 'EXTERNAL_EMAIL', 'EXTERNAL_API']);
-export const decisionSchema = z.enum(['ALLOW', 'REVIEW', 'BLOCK']);
+export const eventActionSchema = z
+  .enum(['READ_DATA', 'WRITE_DATA', 'DELETE_DATA', 'EXPORT_DATA', 'SEND_EMAIL'])
+  .describe('Event action. Allowed values: READ_DATA, WRITE_DATA, DELETE_DATA, EXPORT_DATA, SEND_EMAIL.');
+export const eventDestinationSchema = z
+  .enum(['INTERNAL', 'EXTERNAL_EMAIL', 'EXTERNAL_API'])
+  .describe('Where the data goes. Allowed values: INTERNAL, EXTERNAL_EMAIL, EXTERNAL_API.');
+export const decisionSchema = z.enum(['ALLOW', 'REVIEW', 'BLOCK']).describe('ALLOW, REVIEW, or BLOCK.');
 
 const dlpTypeSchema = z.enum([
   'CPF',
@@ -42,14 +46,20 @@ const conditionFields = {
     .optional()
     .describe('EXTERNAL matches an external destination. INTERNAL matches an internal one. This is not the event destination enum.'),
   destinationContains: z.string().max(100).optional().describe('Case-insensitive substring of the destination.'),
-  containsSensitiveData: z.boolean().optional(),
+  containsSensitiveData: z.boolean().optional().describe('Whether the action is treated as containing sensitive data.'),
   minRecords: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional().describe('recordsAffected is greater than or equal to this value.'),
   maxRecords: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional().describe('recordsAffected is less than or equal to this value.'),
-  minRiskScore: z.number().int().min(0).max(100).optional(),
+  minRiskScore: z.number().int().min(0).max(100).optional().describe('Risk score from 0 to 100. The condition matches at or above this score.'),
   outsideBusinessHours: z.boolean().optional().describe('Monday to Friday 09:00-18:00 in the organization time zone, inverted.'),
-  agentIds: z.array(z.string()).max(100).optional(),
-  dlpTypes: z.array(dlpTypeSchema).optional(),
-  lgpdCategories: z.array(lgpdCategorySchema).optional(),
+  agentIds: z.array(z.string()).max(100).optional().describe('Agent ids. The event agent must be one of these ids.'),
+  dlpTypes: z
+    .array(dlpTypeSchema)
+    .optional()
+    .describe('Sensitive-data types. Allowed values: CPF, CNPJ, RG, CNH, PIX_KEY, PHONE_BR, CEP, CREDIT_CARD, EMAIL, HEALTH_DATA, API_KEY, PRIVATE_KEY.'),
+  lgpdCategories: z
+    .array(lgpdCategorySchema)
+    .optional()
+    .describe('LGPD categories. Allowed values: IDENTIFICATION, CONTACT, LOCATION, FINANCIAL, HEALTH, COMPANY, CREDENTIALS.'),
 };
 
 export type PolicyCondition = {
@@ -80,8 +90,8 @@ export const policyConditionSchema: z.ZodType<PolicyCondition> = z.lazy(() =>
 
 export const policySpecSchema = z
   .object({
-    name: z.string().min(1).max(120),
-    description: z.string().max(500).optional(),
+    name: z.string().min(1).max(120).describe('Policy name. Unique in the organization.'),
+    description: z.string().max(500).optional().describe('What the policy is for. Optional. At most 500 characters.'),
     enabled: z.boolean().optional().describe('Omitted defaults to true on the API.'),
     action: z.enum(['ANY', 'READ', 'WRITE', 'DELETE', 'EXPORT']).describe('Action family, not an event action such as EXPORT_DATA.'),
     resource: z
@@ -89,9 +99,9 @@ export const policySpecSchema = z
       .nullable()
       .optional()
       .describe('Resource classification. ANY, null, and omitted match every classification.'),
-    condition: policyConditionSchema.optional(),
-    decision: decisionSchema,
-    mode: z.enum(['ENFORCE', 'MONITOR']).optional().describe('Omitted defaults to ENFORCE on the API.'),
+    condition: policyConditionSchema.optional().describe('When the policy matches. Omitted matches every event with this action and resource.'),
+    decision: decisionSchema.describe('Result when the policy matches. Allowed values: ALLOW, REVIEW, or BLOCK.'),
+    mode: z.enum(['ENFORCE', 'MONITOR']).optional().describe('Omitted defaults to ENFORCE on the API. Allowed values: ENFORCE, MONITOR.'),
     approverRoles: z
       .array(z.enum(['OWNER', 'ADMIN', 'MEMBER']))
       .max(3)
@@ -106,22 +116,23 @@ export const policyTestInputSchema = z
     action: eventActionSchema,
     resource: z.string().min(1).max(100).describe('Resource name registered in Vulnify, not the policy resource classification.'),
     destination: eventDestinationSchema.optional(),
-    recordsAffected: z.number().int().min(0).max(100_000_000).optional(),
-    containsSensitiveData: z.boolean().optional(),
+    recordsAffected: z.number().int().min(0).max(100_000_000).optional().describe('How many records the action would touch. Optional. 0 to 100000000.'),
+    containsSensitiveData: z.boolean().optional().describe('Whether the case is treated as containing sensitive data. The dry run does not scan content.'),
   })
   .strict();
 
 export const policyTestCaseSchema = z
   .object({
-    name: z.string().min(1).max(200),
-    input: policyTestInputSchema,
+    name: z.string().min(1).max(200).describe('Case name. Returned with the result.'),
+    input: policyTestInputSchema.describe('Action to evaluate. Agent, action, and resource are required. The dry run does not scan content.'),
     expect: z
       .object({
-        decision: decisionSchema,
+        decision: decisionSchema.describe('Expected decision. Allowed values: ALLOW, REVIEW, or BLOCK.'),
         policy: z.string().min(1).max(120).optional().describe('Expected matched policy name.'),
       })
       .strict()
-      .optional(),
+      .optional()
+      .describe('Expected decision and optional policy name. When omitted, pass is null.'),
   })
   .strict();
 
@@ -138,7 +149,7 @@ export const checkActionInput = z
     action: eventActionSchema,
     resource: z.string().min(1).max(100).describe('Resource name. The dry run does not accept resourceId.'),
     destination: eventDestinationSchema.optional(),
-    recordsAffected: z.number().int().min(0).max(100_000_000).optional(),
+    recordsAffected: z.number().int().min(0).max(100_000_000).optional().describe('How many records the action would touch. Optional. 0 to 100000000.'),
     containsSensitiveData: z.boolean().optional().describe('Hint for policy conditions. This call does not scan content.'),
   })
   .strict();
@@ -150,8 +161,8 @@ export const decideActionInput = z
     action: eventActionSchema,
     resource: z.string().min(1).max(100).optional().describe('Resource name. Use this or resourceId.'),
     resourceId: z.string().uuid().optional().describe('Resource id. Use this or resource.'),
-    destination: eventDestinationSchema.optional(),
-    recordsAffected: z.number().int().min(0).max(100_000_000).optional(),
+    destination: eventDestinationSchema.optional().describe('Where the data goes. Allowed values: INTERNAL, EXTERNAL_EMAIL, EXTERNAL_API.'),
+    recordsAffected: z.number().int().min(0).max(100_000_000).optional().describe('How many records the action would touch. Optional. 0 to 100000000.'),
     content: z
       .string()
       .max(100_000)
@@ -190,13 +201,13 @@ export const testPoliciesInput = z
       .max(200)
       .optional()
       .describe('When set, these policies are evaluated instead of the stored ones. Nothing is written.'),
-    cases: z.array(policyTestCaseSchema).min(1).max(200),
+    cases: z.array(policyTestCaseSchema).min(1).max(200).describe('One to 200 cases. Each case has a name, an input, and an optional expected decision.'),
   })
   .strict();
 
 export const planPolicyChangesInput = z
   .object({
-    policies: z.array(policySpecSchema),
+    policies: z.array(policySpecSchema).describe('Policies to diff against the stored set. Each item needs name, action, and decision. Nothing is written.'),
     prune: z.boolean().optional().describe('When true, the plan marks stored policies whose names are missing from policies for deletion. Nothing is deleted.'),
   })
   .strict();
@@ -205,12 +216,12 @@ export const checkMcpToolCallInput = z
   .object({
     tool: z.string().min(1).max(200).describe('Downstream MCP tool name. Vulnify maps it to an action by substring. The tool is not executed.'),
     arguments: z.record(z.string(), z.unknown()).optional().describe('Tool arguments. Not executed by Vulnify.'),
-    agent: z.string().min(1).max(100).optional(),
-    agentId: z.string().uuid().optional(),
-    resource: z.string().min(1).max(100).optional(),
-    resourceId: z.string().uuid().optional(),
+    agent: z.string().min(1).max(100).optional().describe('Agent name. Use this or agentId. A registered MCP route can supply a default agent.'),
+    agentId: z.string().uuid().optional().describe('Agent id (UUID). Use this or agent.'),
+    resource: z.string().min(1).max(100).optional().describe('Resource name registered in Vulnify. Use this or resourceId.'),
+    resourceId: z.string().uuid().optional().describe('Resource id (UUID). Use this or resource.'),
     destination: eventDestinationSchema.optional(),
-    recordsAffected: z.number().int().min(0).max(100_000_000).optional(),
+    recordsAffected: z.number().int().min(0).max(100_000_000).optional().describe('How many records the tool call would touch. Optional. 0 to 100000000.'),
     content: z.string().max(100_000).optional().describe('Optional text scanned for sensitive data. Scanned in memory and not stored. This server does not log it.'),
     routeId: z.string().uuid().optional().describe('Registered MCP route. Supplies a default agent.'),
     idempotencyKey: idempotencyKeySchema.optional(),
@@ -224,3 +235,46 @@ export type TestPoliciesInput = z.infer<typeof testPoliciesInput>;
 export type PlanPolicyChangesInput = z.infer<typeof planPolicyChangesInput>;
 export type CheckMcpToolCallInput = z.infer<typeof checkMcpToolCallInput>;
 export type PolicySpec = z.infer<typeof policySpecSchema>;
+
+const loose = <T extends z.ZodRawShape>(shape: T) => z.object(shape).catchall(z.unknown());
+
+/** Recorded decision. Extra API fields are allowed. id and finalDecision are the stable required fields. */
+export const decisionOutput = loose({
+  id: z.string().describe('Decision id.'),
+  finalDecision: decisionSchema.describe('Authoritative result. Allowed values: ALLOW, REVIEW, BLOCK.'),
+});
+
+export const getDecisionOutput = loose({
+  id: z.string().describe('Decision id.'),
+  finalDecision: decisionSchema.describe('Authoritative result. Allowed values: ALLOW, REVIEW, BLOCK.'),
+  waitTimedOut: z.boolean().describe('True when the wait elapsed and finalDecision is still REVIEW.'),
+});
+
+/** POST /v1/policies/test. A result may include null matchedPolicy and null pass. */
+export const policyTestOutput = loose({
+  results: z
+    .array(
+      loose({
+        name: z.string().describe('Case name.'),
+        decision: decisionSchema,
+      }),
+    )
+    .describe('One result per case.'),
+});
+
+export const policyListOutput = loose({
+  apiVersion: z.literal('vulnify.io/v1').describe('Always vulnify.io/v1.'),
+  policies: z.array(loose({ name: z.string().describe('Policy name.') })).describe('Stored policies sorted by name.'),
+});
+
+export const planOutput = loose({
+  dryRun: z.boolean().describe('Always true. The plan is not applied.'),
+  changes: z
+    .array(
+      loose({
+        name: z.string().describe('Policy name.'),
+        op: z.enum(['create', 'update', 'delete', 'unchanged']).describe('create, update, delete, or unchanged.'),
+      }),
+    )
+    .describe('Creates, updates, deletes, and unchanged names.'),
+});

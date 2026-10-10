@@ -3,7 +3,8 @@ import { describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildPlanBody, VulnifyClient } from './api.js';
-import { DEFAULT_BASE_URL, INSTRUCTIONS, OAUTH_INSTRUCTIONS, VERSION } from './constants.js';
+import { DECISIONS_URI, DEFAULT_BASE_URL, INSTRUCTIONS, OAUTH_INSTRUCTIONS, VERSION, WEBSITE_URL } from './constants.js';
+import { decisionOutput, getDecisionOutput, planOutput, policyListOutput, policyTestOutput } from './schemas.js';
 import { createVulnifyServer } from './server.js';
 import { readFileSync } from 'node:fs';
 
@@ -78,6 +79,60 @@ async function withClient(
   };
 }
 
+function assertDescribed(schema: unknown, path: string): void {
+  const root = schema && typeof schema === 'object' ? (schema as Record<string, unknown>) : {};
+  walkSchema(schema, path, root, new Set());
+}
+
+function walkSchema(node: unknown, path: string, root: Record<string, unknown>, seen: Set<string>): void {
+  if (!node || typeof node !== 'object') return;
+  const ref = typeof (node as { $ref?: unknown }).$ref === 'string' ? (node as { $ref: string }).$ref : undefined;
+  if (ref) {
+    if (seen.has(ref)) return;
+    seen.add(ref);
+  }
+  const current = (resolveRef(node, root) ?? node) as Record<string, unknown>;
+  const properties = current.properties;
+  if (properties && typeof properties === 'object') {
+    for (const [key, value] of Object.entries(properties as Record<string, unknown>)) {
+      assert.ok(hasDescription(value, root), `${path}.${key} needs a description`);
+      walkSchema(value, `${path}.${key}`, root, seen);
+    }
+  }
+  if ('items' in current) walkSchema(current.items, `${path}[]`, root, seen);
+  for (const combiner of ['anyOf', 'oneOf', 'allOf']) {
+    const list = current[combiner];
+    if (Array.isArray(list)) {
+      for (const item of list) walkSchema(item, path, root, seen);
+    }
+  }
+}
+
+function hasDescription(node: unknown, root: Record<string, unknown>): boolean {
+  if (!node || typeof node !== 'object') return false;
+  const current = node as Record<string, unknown>;
+  if (typeof current.description === 'string' && current.description.length > 0) return true;
+  const resolved = resolveRef(node, root);
+  if (resolved && resolved !== node && typeof (resolved as { description?: unknown }).description === 'string') return true;
+  for (const combiner of ['anyOf', 'oneOf', 'allOf']) {
+    const list = current[combiner];
+    if (Array.isArray(list) && list.some((item) => hasDescription(item, root))) return true;
+  }
+  return false;
+}
+
+function resolveRef(node: unknown, root: Record<string, unknown>): unknown {
+  if (!node || typeof node !== 'object') return node;
+  const ref = (node as { $ref?: unknown }).$ref;
+  if (typeof ref !== 'string' || !ref.startsWith('#/')) return node;
+  let current: unknown = root;
+  for (const part of ref.slice(2).split('/')) {
+    if (!current || typeof current !== 'object') return node;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
 function textOf(result: unknown): string {
   assert.ok(result && typeof result === 'object' && 'content' in result && Array.isArray(result.content), 'expected content');
   const block = (result.content as Array<{ type: string; text?: string }>).find((item) => item.type === 'text');
@@ -115,6 +170,12 @@ describe('tools', () => {
       const names = (await mcp.listTools()).tools.map((tool) => tool.name).sort();
       assert.deepEqual(names, ['check_action', 'decide_action', 'get_decision', 'list_policies', 'test_policies']);
       assert.equal(mcp.getInstructions(), OAUTH_INSTRUCTIONS);
+      assert.deepEqual(
+        (await mcp.listPrompts()).prompts.map((prompt) => prompt.name).sort(),
+        ['guard_action', 'review_policies'],
+      );
+      assert.equal((await mcp.listResources()).resources[0]?.uri, DECISIONS_URI);
+      assert.equal(mcp.getServerVersion()?.websiteUrl, WEBSITE_URL);
     } finally {
       await mcp.close();
       await server.close();
@@ -161,9 +222,101 @@ describe('tools', () => {
       assert.match(byName.get('decide_action')?.description ?? '', /record/i);
       assert.match(byName.get('check_mcp_tool_call')?.description ?? '', /record/i);
       assert.match(byName.get('plan_policy_changes')?.description ?? '', /cannot be turned off/);
+      for (const tool of listed.tools) {
+        assert.ok(tool.outputSchema, tool.name);
+        assert.notEqual(tool.outputSchema.additionalProperties, false, tool.name);
+        assertDescribed(tool.inputSchema, tool.name);
+      }
+      const prompts = await mcp.listPrompts();
+      const guard = prompts.prompts.find((prompt) => prompt.name === 'guard_action');
+      const review = prompts.prompts.find((prompt) => prompt.name === 'review_policies');
+      assert.ok(guard);
+      assert.deepEqual(
+        guard.arguments?.map((argument) => argument.name),
+        ['agent', 'action', 'resource', 'destination', 'records'],
+      );
+      assert.deepEqual(
+        guard.arguments?.filter((argument) => argument.required).map((argument) => argument.name),
+        ['agent', 'action', 'resource'],
+      );
+      assert.ok(review);
+      assert.equal(review.arguments, undefined);
+      const resources = await mcp.listResources();
+      assert.equal(resources.resources[0]?.uri, DECISIONS_URI);
+      const read = await mcp.readResource({ uri: DECISIONS_URI });
+      const resourceText = JSON.stringify(read);
+      assert.match(resourceText, /finalDecision/);
+      assert.match(resourceText, /ALLOW/);
+      assert.match(resourceText, /REVIEW/);
+      assert.match(resourceText, /BLOCK/);
+      assert.doesNotMatch(resourceText, /obey/i);
+      const guardText = JSON.stringify(
+        await mcp.getPrompt({
+          name: 'guard_action',
+          arguments: {
+            agent: 'SalesBot',
+            action: 'EXPORT_DATA',
+            resource: 'Customer Database',
+            records: '12',
+          },
+        }),
+      );
+      assert.match(guardText, /SalesBot/);
+      assert.match(guardText, /check_action/);
+      assert.match(guardText, /ALLOW/);
+      assert.match(guardText, /REVIEW/);
+      assert.match(guardText, /BLOCK/);
+      assert.doesNotMatch(guardText, /obey/i);
+      const reviewText = JSON.stringify(await mcp.getPrompt({ name: 'review_policies' }));
+      assert.match(reviewText, /list_policies/);
+      assert.match(reviewText, /test_policies/);
     } finally {
       await close();
     }
+  });
+
+  it('accepts recorded API samples, including nulls and extra fields', () => {
+    const recorded = {
+      ...decision,
+      policy: null,
+      review: null,
+      idempotentReplay: false,
+      gateway: { route: 'customers' },
+    };
+    assert.equal(decisionOutput.safeParse(recorded).success, true);
+    assert.equal(getDecisionOutput.safeParse({ ...recorded, waitTimedOut: true }).success, true);
+    assert.equal(getDecisionOutput.safeParse(recorded).success, false);
+    assert.equal(
+      policyTestOutput.safeParse({
+        results: [
+          {
+            name: 'check_action',
+            decision: 'ALLOW',
+            matchedPolicy: null,
+            riskScore: 5,
+            riskLevel: 'LOW',
+            reasons: [],
+            pass: null,
+          },
+        ],
+      }).success,
+      true,
+    );
+    assert.equal(policyTestOutput.safeParse({ results: [] }).success, true);
+    assert.equal(policyTestOutput.safeParse({ results: [{ decision: 'ALLOW' }] }).success, false);
+    assert.equal(
+      policyListOutput.safeParse({
+        apiVersion: 'vulnify.io/v1',
+        policies: [{ name: 'block-export', id: '9b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e', updatedAt: '2026-01-01T00:00:00Z' }],
+      }).success,
+      true,
+    );
+    assert.equal(policyListOutput.safeParse({ apiVersion: 'vulnify.io/v1', policies: [] }).success, true);
+    assert.equal(
+      planOutput.safeParse({ dryRun: true, changes: [{ name: 'block-export', op: 'create', id: 'extra' }] }).success,
+      true,
+    );
+    assert.equal(decisionOutput.safeParse({ id: recorded.id }).success, false);
   });
 
   it('check_action posts one dry-run case and does not send content or policies', async () => {
