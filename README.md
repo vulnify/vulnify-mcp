@@ -1,45 +1,51 @@
-# @vulnify/mcp
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/logo.png" alt="Vulnify" width="88" />
+</p>
 
-Vulnify is a runtime authorization layer for AI agents. This package is the MCP server. An agent asks Vulnify before it reads, writes, deletes, exports, or sends data. The outcome to obey is `finalDecision`: `ALLOW`, `REVIEW`, or `BLOCK`.
+<h1 align="center">Vulnify MCP</h1>
+
+<p align="center">
+  Ask Vulnify before an AI agent reads, writes, deletes, exports, or sends data.<br />
+  The outcome to obey is <strong>ALLOW</strong>, <strong>REVIEW</strong>, or <strong>BLOCK</strong>.
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@vulnify/mcp"><img alt="npm version" src="https://img.shields.io/npm/v/@vulnify/mcp?color=3D6DFF" /></a>
+  <a href="https://www.npmjs.com/package/@vulnify/mcp"><img alt="npm downloads" src="https://img.shields.io/npm/dm/@vulnify/mcp?color=3D6DFF" /></a>
+  <a href="https://github.com/vulnify/vulnify-mcp/blob/main/LICENSE"><img alt="license" src="https://img.shields.io/github/license/vulnify/vulnify-mcp?color=3D6DFF" /></a>
+  <a href="https://github.com/vulnify/vulnify-mcp/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/vulnify/vulnify-mcp/ci.yml?branch=main&amp;label=CI" /></a>
+</p>
+
+<p align="center">
+  <a href="https://docs.vulnify.io">Docs</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/vulnify/vulnify-mcp">MCP</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/vulnify/vulnify-mcp/blob/main/CHANGELOG.md">Changelog</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/vulnify/vulnify-sdk">Node SDK</a>
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/banner.png" alt="Decide every AI agent action before it runs. ALLOW, REVIEW, or BLOCK, with the reasons and the proof." width="720" />
+</p>
+
+`@vulnify/mcp` is the MCP server for [Vulnify](https://docs.vulnify.io), a runtime authorization layer for AI agents. The agent asks first. This process proxies `https://api.vulnify.io`. It does not store events or API keys.
+
+Two transports, one server:
+
+- **stdio** for a local client: `npx -y @vulnify/mcp`
+- **stateless Streamable HTTP** at `/mcp`, intended to be deployed at `https://mcp.vulnify.io/mcp`
 
 `check_action` is a dry run. It skips the PII scan and records nothing. `decide_action` records a real decision. A `REVIEW` waits for a person. This server cannot approve or deny one.
 
-The same code speaks two transports:
+Application code that should decide inside your own process uses the [Node SDK](https://github.com/vulnify/vulnify-sdk) (`@vulnify/sdk`). This package does not depend on the SDK. The SDK turns some transport failures into a fail-closed decision. This server returns those failures as MCP tool errors, so a model does not read them as `ALLOW`.
 
-- **stdio** for local clients: `npx -y @vulnify/mcp`
-- **stateless Streamable HTTP** at `/mcp`, to be deployed at `https://mcp.vulnify.io/mcp`
+## Quickstart
 
-Production API: `https://api.vulnify.io`. This server is a thin proxy. It does not store events or keys.
+Node.js 20 or newer. Use a dedicated **TEST** key (`vln_test_...`) to try a client. Client snippets for Cursor, Claude Code, Claude Desktop, and VS Code are in [docs/clients.md](docs/clients.md).
 
-Documentation for clients: [docs/clients.md](docs/clients.md).
-
-## Tools
-
-Every tool has a title and `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint` annotations. Hints tell the client how to present the tool. They do not change what the tool does.
-
-| Tool | API | Records? | readOnlyHint | Notes |
-| --- | --- | --- | --- | --- |
-| `check_action` | `POST /v1/policies/test` (one case) | No | true | Skips the PII scan and records nothing. No event id. |
-| `decide_action` | `POST /v1/events` | Yes | false | Writes a security event and an audit entry. Obey `finalDecision`. |
-| `get_decision` | `GET /v1/events/{id}` | No | true | Reads a decision. Optional wait polls a `REVIEW` until `ALLOW` or `BLOCK` (30 seconds max). |
-| `list_policies` | `GET /v1/policies` | No | true | Policies as code, sorted by name. |
-| `test_policies` | `POST /v1/policies/test` | No | true | Up to 200 cases. Skips the PII scan. Proposed `policies` are not saved. |
-| `plan_policy_changes` | `POST /v1/policies/apply` | No | true | `dryRun` is forced to true and cannot be turned off. Needs an org-wide LIVE key. |
-| `check_mcp_tool_call` | `POST /v1/gateway/mcp` | Yes | false | Maps a tool name to an action and records the decision. Does not run the tool. |
-
-`destructiveHint` is false on every tool. `openWorldHint` is true on every tool, because each call reads or writes organization state at the Vulnify API. `idempotentHint` is true for the read-only tools and false for `decide_action` and `check_mcp_tool_call` (pass `idempotencyKey` so a retry does not record a second event).
-
-There is no approve tool, no deny tool, and no tool that applies policy changes. A human resolves a `REVIEW` in Vulnify. `plan_policy_changes` only returns the diff.
-
-`POST /v1/gateway/http` is not exposed. On `ALLOW` that endpoint forwards the HTTP call.
-
-Policy list, test, and plan calls are limited to 60 requests per minute per key. Batch dry runs with `test_policies`. `POST /v1/events` has its own limit; the OpenAPI text says only that the limit was exceeded.
-
-## Install
-
-Node.js 20 or newer.
-
-### stdio
+### Local stdio
 
 ```bash
 npx -y @vulnify/mcp
@@ -63,7 +69,7 @@ Cursor (`.cursor/mcp.json`):
 
 ### Remote Streamable HTTP
 
-`https://mcp.vulnify.io/mcp` is not deployed yet. API-key IP allowlists are checked against the hosted server's egress IP when using that URL, not the end user's IP. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`) instead.
+`https://mcp.vulnify.io/mcp` is not deployed yet. When it is, send the API key on every request. The server keeps no session.
 
 ```json
 {
@@ -78,24 +84,86 @@ Cursor (`.cursor/mcp.json`):
 }
 ```
 
-`X-Vulnify-Key: <key>` is accepted as well. A request with no key gets **401** and `WWW-Authenticate: Bearer`. `GET /health` does not require a key.
+`X-Vulnify-Key: <key>` is accepted as well. A request with no key gets **401** and `WWW-Authenticate: Bearer`. `GET /health` does not require a key. Responses are JSON.
 
-The HTTP server is stateless: one MCP server per request, no session store. Any replica can serve any call. Responses are JSON rather than a long-lived SSE stream.
+One-click Grok connectors and the Claude connectors directory authenticate with OAuth. This server does not implement OAuth yet (planned for v1.1), so there is no one-click install for those products. Use `npx -y @vulnify/mcp` with Cursor, Claude Code, Claude Desktop, or VS Code. Remote-URL snippets are kept in their own section of [docs/clients.md](docs/clients.md#remote-url-not-live-yet).
 
-More clients, and the ones that do not work with an API key yet: [docs/clients.md](docs/clients.md).
+## How it works
 
-## Environment
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/how-it-works.svg" alt="An agent action goes to Vulnify. finalDecision is ALLOW (the action may run), REVIEW (a person decides), or BLOCK (the action does not run)." width="720" />
+</p>
+
+Obey `finalDecision`. A tool error is not an `ALLOW`.
+
+## Tools
+
+Every tool has a title and `readOnlyHint`, `destructiveHint`, `idempotentHint`, and `openWorldHint`. Hints tell the client how to present the tool. They do not change what the tool does.
+
+| Tool | API | Records? | readOnlyHint | Notes |
+| --- | --- | --- | --- | --- |
+| `check_action` | `POST /v1/policies/test` (one case) | No | true | Skips the PII scan and records nothing. No event id. |
+| `decide_action` | `POST /v1/events` | Yes | false | Writes a security event and an audit entry. Obey `finalDecision`. |
+| `get_decision` | `GET /v1/events/{id}` | No | true | Reads a decision. Optional wait polls a `REVIEW` until `ALLOW` or `BLOCK` (30 seconds max). |
+| `list_policies` | `GET /v1/policies` | No | true | Policies as code, sorted by name. |
+| `test_policies` | `POST /v1/policies/test` | No | true | Up to 200 cases. Skips the PII scan. Proposed `policies` are not saved. |
+| `plan_policy_changes` | `POST /v1/policies/apply` | No | true | `dryRun` is forced to true. Needs an org-wide LIVE key. |
+| `check_mcp_tool_call` | `POST /v1/gateway/mcp` | Yes | false | Maps a tool name to an action and records the decision. Does not run the tool. |
+
+`destructiveHint` is false on every tool. `openWorldHint` is true on every tool, because each call reads or writes organization state at the Vulnify API. `idempotentHint` is true for the read-only tools and false for `decide_action` and `check_mcp_tool_call`. Pass `idempotencyKey` so a retry does not record a second event.
+
+Policy list, test, and plan calls are limited to 60 requests per minute per key. Batch dry runs with `test_policies`. `POST /v1/events` has its own limit. The OpenAPI text says only that the limit was exceeded.
+
+## Safety
+
+This server cannot change a review and cannot save a policy.
+
+- There is no approve tool and no deny tool. A human resolves a `REVIEW` in Vulnify.
+- There is no apply tool. `plan_policy_changes` calls `POST /v1/policies/apply` with `dryRun: true` on every request. The tool input has no `dryRun` field. The server sets `dryRun` last, so a caller cannot turn the dry run off. The tool returns the diff.
+- `POST /v1/gateway/http` is not a tool. On `ALLOW`, that API endpoint forwards the HTTP call. This server does not.
+
+`plan_policy_changes` needs an org-wide LIVE key. A TEST key or an agent-bound key gets 403.
+
+## Distinct from the MCP gateway
+
+`https://mcp.vulnify.io/mcp` (and the local stdio process) is the server an MCP client connects to. The client then calls the tools above.
+
+`check_mcp_tool_call` is different. It sends one tool call to `POST /v1/gateway/mcp` on `api.vulnify.io`, records the decision, and stops. It does not execute the tool, and connecting a client to this server does not call that gateway.
+
+## IP allowlists
+
+API-key IP allowlists are checked against the hosted server's egress IP when using `https://mcp.vulnify.io/mcp`, not the end user's IP. The hosted process calls `api.vulnify.io` from its own address. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`). stdio runs on the user's machine, so the allowlist sees that machine.
+
+## Product
+
+Screenshots are from a demo workspace. Agent names are `SalesBot` and `SupportBot`.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/audit-logs.png" alt="Audit log listing two allowed decisions for SalesBot and SupportBot." width="720" />
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/block-detail.png" alt="A blocked export: SalesBot, 12,000 records, external email, critical risk." width="720" />
+</p>
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/allow-detail.png" alt="An allowed read: SupportBot, one record, internal destination, low risk." width="720" />
+</p>
+
+Audit exports in the Vulnify app are a JSON or CSV download that includes a SHA-256 checksum. SIEM export is JSON or CEF lines.
+
+## Configuration
 
 | Variable | Where | Required | Purpose |
 | --- | --- | --- | --- |
-| `VULNIFY_API_KEY` | stdio process | yes | API key (`vln_live_...` or `vln_test_...`). Not used as a fallback for HTTP. |
+| `VULNIFY_API_KEY` | stdio process | yes | API key (`vln_live_...` or `vln_test_...`). HTTP does not fall back to this variable. |
 | `VULNIFY_BASE_URL` | both | no | API base URL. Default `https://api.vulnify.io`. |
 | `PORT` | HTTP | no | Listen port. Default `8080`. |
 | `HOST` | HTTP | no | Bind address. Default `0.0.0.0`. |
 
-Use a dedicated **TEST** key to try the server. Use an **agent-bound LIVE** key when a recorded decision should count for one agent. `plan_policy_changes` needs an **org-wide LIVE** key. A TEST key or an agent-bound key gets 403 on that tool.
+Use an **agent-bound LIVE** key when a recorded decision should count for one agent. `plan_policy_changes` needs an **org-wide LIVE** key.
 
-`VULNIFY_TEST_API_KEY` is only for `npm run test:live`. It is not read by the server.
+`VULNIFY_TEST_API_KEY` is only for `npm run test:live`. The server does not read it.
 
 ## HTTP server
 
@@ -103,41 +171,22 @@ Use a dedicated **TEST** key to try the server. Use an **agent-bound LIVE** key 
 npx -y @vulnify/mcp --http
 ```
 
-Docker (image runs the HTTP server as a non-root user):
+The container runs the HTTP server as a non-root user:
 
 ```bash
-docker build -t vulnify-mcp:0.1.0 .
-docker run --rm -p 8080:8080 -e PORT=8080 vulnify-mcp:0.1.0
+docker build -t vulnify-mcp .
+docker run --rm -p 8080:8080 -e PORT=8080 vulnify-mcp
 ```
 
-Optional: `-e VULNIFY_BASE_URL=https://api.vulnify.io`. No API key is required to start the container. Send the key on each request.
+No API key is required to start the container. Send the key on each request.
 
 ```bash
 curl -sS localhost:8080/health
-curl -sS -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/mcp -H 'content-type: application/json' -d '{}'
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/mcp \
+  -H 'content-type: application/json' -d '{}'
 ```
 
 The health check prints JSON. The POST without a key prints `401`.
-
-## Security
-
-Network endpoints this process uses:
-
-- `https://api.vulnify.io` (or `VULNIFY_BASE_URL`) for every tool call. The key is sent as `Authorization: Bearer`.
-- `https://mcp.vulnify.io/mcp` is where the HTTP transport is meant to be deployed. It is not called by the server itself.
-
-Credentials:
-
-- stdio reads `VULNIFY_API_KEY` from the environment.
-- HTTP reads `Authorization: Bearer <key>` or `X-Vulnify-Key` per request.
-
-Keys are not logged. Request logs are method, path, and status. `content` sent for a sensitive-data scan is forwarded to the API and is not written to this server's logs. The API scans that text in memory and does not store it.
-
-API-key IP allowlists are checked against the hosted server's egress IP when using `https://mcp.vulnify.io/mcp`, not the end user's IP. The hosted process calls `api.vulnify.io` from its own address. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`) instead. stdio runs on the user's machine, so the allowlist sees that machine.
-
-This package does not run a shell, does not register hooks, and does not approve reviews. Do not put a key in a tool argument or in a committed config file.
-
-`@vulnify/sdk` is a separate client for application code (`check()`, `guard()`). This server does not depend on it. The SDK turns some transport failures into a fail-closed decision; this server returns those failures as MCP tool errors so the model does not confuse them with `ALLOW`.
 
 ## Errors
 
@@ -150,6 +199,19 @@ Tool failures are MCP tool errors (`isError`). The API key is not included.
 | 413 | The JSON body is over the API's 200 KB limit. |
 | 429 | The key is rate limited. Policy calls are 60 per minute. Retry a recorded decision with the same `idempotencyKey`. |
 
+## Security
+
+Report a vulnerability through [GitHub private vulnerability reporting](https://github.com/vulnify/vulnify-mcp/security/advisories/new). See [SECURITY.md](SECURITY.md).
+
+Keys are not logged. Request logs are method, path, and status. `content` sent for a sensitive-data scan is forwarded to the API and is not written to this server's logs. The API scans that text in memory and does not store it.
+
+This package does not run a shell and does not register hooks. Do not put a key in a tool argument or in a committed config file.
+
+Network endpoints this process uses:
+
+- `https://api.vulnify.io` (or `VULNIFY_BASE_URL`) for every tool call. The key is sent as `Authorization: Bearer`.
+- `https://mcp.vulnify.io/mcp` is where the HTTP transport is meant to be deployed. The server process does not call that URL.
+
 ## Development
 
 ```bash
@@ -161,7 +223,7 @@ npm run build
 
 `npm run test:live` calls `list_policies` on `https://api.vulnify.io` when `VULNIFY_TEST_API_KEY` is set, and skips when it is not. It does not record an event.
 
-Publishing is described in [RELEASING.md](RELEASING.md). Do not publish from a laptop as part of normal releases.
+Publishing is described in [RELEASING.md](RELEASING.md).
 
 ## License
 
