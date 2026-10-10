@@ -1,7 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.1.3
 
+docs: finalDecision is the authoritative result
+
+- The README, client docs, and skills say `finalDecision` is the authoritative result: ALLOW, REVIEW, or BLOCK.
+- CI validates every SVG with `xmllint --noout`.
 - Hosted HTTP accepts OAuth 2.1 user access tokens (`vln_oat_...`) and still accepts `vln_live_` / `vln_test_` API keys. A request with no credentials returns 401 with the protected-resource `WWW-Authenticate` challenge. `plan_policy_changes` and `check_mcp_tool_call` stay on API-key and stdio sessions.
 - An OAuth `tools/list` returns `check_action`, `decide_action`, `get_decision`, `list_policies`, and `test_policies`. The 401 challenge includes `scope="decisions:read decisions:write policies:read policies:test"`. Protected-resource metadata on `mcp.vulnify.io` lists those four scopes.
 - The Cursor plugin connects to `https://mcp.vulnify.io/mcp` and signs in with Vulnify. Plugin version 0.1.3. The server card includes tool annotations.

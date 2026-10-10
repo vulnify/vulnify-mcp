@@ -6,7 +6,7 @@
 
 <p align="center">
   Ask Vulnify before an AI agent reads, writes, deletes, exports, or sends data.<br />
-  The outcome to obey is <strong>ALLOW</strong>, <strong>REVIEW</strong>, or <strong>BLOCK</strong>.
+  finalDecision is the authoritative result: <strong>ALLOW</strong>, <strong>REVIEW</strong>, or <strong>BLOCK</strong>.
 </p>
 
 <p align="center">

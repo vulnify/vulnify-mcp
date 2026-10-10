@@ -1,6 +1,6 @@
 {
   "name": "@vulnify/mcp",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Vulnify MCP server: runtime authorization for AI agents. Check an action, record a decision, and read policies.",
   "keywords": [
     "vulnify",

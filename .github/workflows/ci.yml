@@ -20,6 +20,21 @@ jobs:
       - run: npm run build
       - run: npm run check:package
 
+  svg:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate SVG files
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libxml2-utils
+          mapfile -d '' files < <(find . -name '*.svg' -not -path './node_modules/*' -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::No SVG files found."
+            exit 1
+          fi
+          xmllint --noout "${files[@]}"
+
   docker:
     runs-on: ubuntu-latest
     steps:

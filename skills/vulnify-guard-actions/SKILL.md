@@ -5,7 +5,7 @@ description: Decide when to call Vulnify check_action, decide_action, or get_dec
 
 # Guard an action with Vulnify
 
-Vulnify decides whether an agent action may run. The outcome to obey is `finalDecision`: `ALLOW`, `REVIEW`, or `BLOCK`.
+Vulnify decides whether an agent action may run. `finalDecision` is the authoritative result: `ALLOW`, `REVIEW`, or `BLOCK`.
 
 This server cannot approve or deny a review. A `REVIEW` is waiting on a person. Do not invent an approval, and do not call another tool to approve it.
 
