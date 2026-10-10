@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+docs: hosted server is live, link docs.vulnify.io/mcp
+
+- `https://mcp.vulnify.io/mcp` is the hosted server. The README and client docs no longer say it is not deployed.
+- The docs link and the quickstart point at https://docs.vulnify.io/mcp/.
+- The README banner shows the whole chrome falcon. The audit screenshot was removed because a cursor covered the button text.
+
 ## 0.1.1
 
 docs: README refresh

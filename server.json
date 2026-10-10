@@ -3,7 +3,7 @@
   "name": "io.vulnify/mcp",
   "title": "Vulnify",
   "description": "Ask Vulnify before an AI agent acts. Check, record, and read policy decisions.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "websiteUrl": "https://docs.vulnify.io",
   "repository": {
     "url": "https://github.com/vulnify/vulnify-mcp",
@@ -21,7 +21,7 @@
     {
       "registryType": "npm",
       "identifier": "@vulnify/mcp",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

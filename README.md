@@ -136,11 +136,7 @@ API-key IP allowlists are checked against the hosted server's egress IP when usi
 
 ## Product
 
-Screenshots are from a demo workspace. The agent in the decision card is `SupportBot`.
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/audit-logs.png" alt="Audit chain check. Entries are append-only and chained with SHA-256. The chain is intact." width="800" />
-</p>
+The screenshot is from a demo workspace. The agent is `SupportBot`.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/allow-detail.png" alt="An allowed read: SupportBot, one record, internal destination, low risk." width="800" />
