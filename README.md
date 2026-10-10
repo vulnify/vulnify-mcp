@@ -69,7 +69,11 @@ Cursor (`.cursor/mcp.json`):
 
 ### Remote Streamable HTTP
 
-[`https://mcp.vulnify.io/mcp`](https://mcp.vulnify.io/mcp) is the hosted server. Send the API key on every request. The server keeps no session.
+[`https://mcp.vulnify.io/mcp`](https://mcp.vulnify.io/mcp) is the hosted server. It keeps no session. Sign in with OAuth, or send an API key on every request.
+
+A Claude custom connector uses the URL only. Do not send a key. Claude follows the 401 challenge, opens Vulnify sign-in, and stops on the consent page until you allow access. The steps are in [docs/clients.md](docs/clients.md#claude-custom-connector).
+
+An API key still works for Cursor, Claude Code, VS Code, and any client that can set a header:
 
 ```json
 {
@@ -84,9 +88,15 @@ Cursor (`.cursor/mcp.json`):
 }
 ```
 
-`X-Vulnify-Key: <key>` is accepted as well. A request with no key gets **401** and `WWW-Authenticate: Bearer`. `GET /health` does not require a key. Responses are JSON.
+`X-Vulnify-Key: <key>` is accepted for `vln_live_...` and `vln_test_...` keys. A request with no credentials gets **401** and:
 
-One-click Grok connectors and the Claude connectors directory authenticate with OAuth. This server does not implement OAuth yet (planned for v1.1), so there is no one-click install for those products. Use `npx -y @vulnify/mcp` with Cursor, Claude Code, Claude Desktop, or VS Code. Remote snippets are in [docs/clients.md](docs/clients.md#remote-url).
+```
+WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp"
+```
+
+`GET /health` does not require a key. `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-protected-resource/mcp` return the protected-resource document (resource `https://mcp.vulnify.io/mcp`, authorization server `https://api.vulnify.io`, bearer header). Responses are JSON.
+
+A `vln_oat_...` access token is checked with `POST /oauth/introspect`, then sent to `/v1/mcp/*`. `check_action` and `test_policies` need `policies:test`. `decide_action` needs `decisions:write`. `get_decision` needs `decisions:read`. `list_policies` needs `policies:read`. `plan_policy_changes` and `check_mcp_tool_call` stay API-key only: the API has no `/v1/mcp` route for policy apply or the MCP gateway. There is no approve tool and no deny tool.
 
 ## How it works
 
@@ -122,7 +132,23 @@ This server cannot change a review and cannot save a policy.
 - There is no apply tool. `plan_policy_changes` calls `POST /v1/policies/apply` with `dryRun: true` on every request. The tool input has no `dryRun` field. The server sets `dryRun` last, so a caller cannot turn the dry run off. The tool returns the diff.
 - `POST /v1/gateway/http` is not a tool. On `ALLOW`, that API endpoint forwards the HTTP call. This server does not.
 
-`plan_policy_changes` needs an org-wide LIVE key. A TEST key or an agent-bound key gets 403.
+`plan_policy_changes` needs an org-wide LIVE key. A TEST key or an agent-bound key gets 403. An OAuth access token cannot call `plan_policy_changes` or `check_mcp_tool_call`.
+
+## OAuth scopes
+
+User login is the hosted HTTP server. The local stdio process still uses an API key. The hosted server maps tools to scopes:
+
+| Tool | Scope | OAuth route |
+| --- | --- | --- |
+| `check_action` | `policies:test` | `POST /v1/mcp/policies/test` |
+| `test_policies` | `policies:test` | `POST /v1/mcp/policies/test` |
+| `decide_action` | `decisions:write` | `POST /v1/mcp/events` |
+| `get_decision` | `decisions:read` | `GET /v1/mcp/events/{id}` |
+| `list_policies` | `policies:read` | `GET /v1/mcp/policies` |
+| `plan_policy_changes` | API key only | No `/v1/mcp` route |
+| `check_mcp_tool_call` | API key only | No `/v1/mcp` route for the gateway |
+
+A token that is missing the scope gets a tool error that names the scope. That error is not an `ALLOW`. Active introspection results are reused for at most 60 seconds, and never past `exp`.
 
 ## Distinct from the MCP gateway
 
@@ -150,6 +176,7 @@ Audit exports in the Vulnify app are a JSON or CSV download that includes a SHA-
 | --- | --- | --- | --- |
 | `VULNIFY_API_KEY` | stdio process | yes | API key (`vln_live_...` or `vln_test_...`). HTTP does not fall back to this variable. |
 | `VULNIFY_BASE_URL` | both | no | API base URL. Default `https://api.vulnify.io`. |
+| `OAUTH_INTROSPECTION_SECRET` | HTTP | for user login | Bearer secret for `POST /oauth/introspect`. Stays on the server. API keys work without it. |
 | `PORT` | HTTP | no | Listen port. Default `8080`. |
 | `HOST` | HTTP | no | Bind address. Default `0.0.0.0`. |
 
@@ -180,7 +207,7 @@ curl -sS -o /dev/null -w '%{http_code}\n' -X POST localhost:8080/mcp \
 
 The health check prints JSON. The POST without a key prints `401`.
 
-`GET /.well-known/mcp/server-card.json` does not require a key. It lists the tools the server registers (names, descriptions, and input schemas), states that a Vulnify API key is required in a header, and links to the docs and this repository.
+`GET /.well-known/mcp/server-card.json` does not require a key. It lists the tools the server registers (names, descriptions, and input schemas), states that you can sign in with OAuth or send a Vulnify API key in a header, and links to the docs and this repository.
 
 ```bash
 curl -sS https://mcp.vulnify.io/.well-known/mcp/server-card.json
@@ -192,8 +219,8 @@ Tool failures are MCP tool errors (`isError`). The API key is not included.
 
 | Status | Meaning |
 | --- | --- |
-| 401 | The API key is missing, invalid, revoked, or expired. |
-| 403 | The key is bound to another agent, the caller IP is not allowlisted, or `plan_policy_changes` was called without an org-wide LIVE key. |
+| 401 | The API key or access token is missing, invalid, revoked, or expired. |
+| 403 | The key is bound to another agent, the caller IP is not allowlisted, the access token lacks a scope, or `plan_policy_changes` was called without an org-wide LIVE key. |
 | 413 | The JSON body is over the API's 200 KB limit. |
 | 429 | The key is rate limited. Policy calls are 60 per minute. Retry a recorded decision with the same `idempotencyKey`. |
 
@@ -207,7 +234,8 @@ This package does not run a shell and does not register hooks. Do not put a key 
 
 Network endpoints this process uses:
 
-- `https://api.vulnify.io` (or `VULNIFY_BASE_URL`) for every tool call. The key is sent as `Authorization: Bearer`.
+- `https://api.vulnify.io` (or `VULNIFY_BASE_URL`) for every tool call. An API key is sent as `Authorization: Bearer` to `/v1/*`. A user access token is sent as `Authorization: Bearer` to `/v1/mcp/*`.
+- `POST /oauth/introspect` on that same origin, with `Authorization: Bearer` set to `OAUTH_INTROSPECTION_SECRET`, to validate `vln_oat_...` tokens. The secret is not sent to clients and is not logged.
 - `https://mcp.vulnify.io/mcp` is the hosted HTTP transport. The server process does not call that URL.
 
 ## Development

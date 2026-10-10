@@ -8,6 +8,32 @@ export const MAX_WAIT_MS = 30_000;
 export const DEFAULT_POLL_MS = 1_000;
 export const MIN_POLL_MS = 200;
 export const REQUEST_TIMEOUT_MS = 20_000;
+/** Active introspection results are reused for at most this long, and never past exp. */
+export const INTROSPECTION_CACHE_MS = 60_000;
+
+/** Canonical MCP resource (RFC 8707). Discovery URLs use this host, not the request Host header. */
+export const MCP_RESOURCE = 'https://mcp.vulnify.io/mcp';
+export const OAUTH_ISSUER = 'https://api.vulnify.io';
+export const PROTECTED_RESOURCE_METADATA_URL = 'https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp';
+
+/**
+ * Same document as GET https://api.vulnify.io/.well-known/oauth-protected-resource.
+ * Served locally so clients can discover the authorization server when the API is slow.
+ */
+export const PROTECTED_RESOURCE_METADATA = {
+  resource: MCP_RESOURCE,
+  authorization_servers: [OAUTH_ISSUER],
+  scopes_supported: [
+    'decisions:read',
+    'decisions:write',
+    'policies:read',
+    'policies:test',
+    'reviews:read',
+    'reviews:decide',
+    'audit:read',
+  ],
+  bearer_methods_supported: ['header'],
+} as const;
 
 export const INSTRUCTIONS = [
   'Vulnify is a runtime authorization layer. Obey finalDecision: ALLOW, REVIEW, or BLOCK.',

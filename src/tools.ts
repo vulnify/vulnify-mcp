@@ -94,9 +94,12 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     },
     async (input: CheckActionInput) =>
       run(async () => {
-        const result = await client.testPolicies({
-          cases: [{ name: 'check_action', input }],
-        });
+        const result = await client.testPolicies(
+          {
+            cases: [{ name: 'check_action', input }],
+          },
+          'check_action',
+        );
         return asRecord(result.body);
       }),
   );

@@ -3,8 +3,16 @@ import { VulnifyApiError, formatApiError } from './errors.js';
 import { redact } from './redact.js';
 import type { PlanPolicyChangesInput, PolicySpec } from './schemas.js';
 
+export interface OAuthAccess {
+  accessToken: string;
+  scopes: readonly string[];
+}
+
 export interface VulnifyClientOptions {
-  apiKey: string;
+  /** API key (`vln_live_...` or `vln_test_...`). Omit when `oauth` is set. */
+  apiKey?: string;
+  /** User access token. Calls `/v1/mcp/*` and enforces the token's scopes. */
+  oauth?: OAuthAccess;
   baseUrl: string;
   fetch?: typeof fetch;
   timeoutMs?: number;
@@ -42,48 +50,106 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
+function oauthApiKeyOnly(tool: string): string {
+  if (tool === 'plan_policy_changes') {
+    return 'plan_policy_changes requires a Vulnify API key (vln_live_... or vln_test_...). An OAuth access token cannot plan policy changes because the API has no /v1/mcp route for policy apply.';
+  }
+  if (tool === 'check_mcp_tool_call') {
+    return 'check_mcp_tool_call requires a Vulnify API key (vln_live_... or vln_test_...). An OAuth access token cannot call the MCP gateway because the API has no /v1/mcp route for it.';
+  }
+  return `${tool} requires a Vulnify API key (vln_live_... or vln_test_...). An OAuth access token cannot call it because the API has no /v1/mcp route for this tool.`;
+}
+
 export class VulnifyClient {
-  private readonly apiKey: string;
+  private readonly authorization: string;
+  private readonly mode: 'api_key' | 'oauth';
+  private readonly scopes: ReadonlySet<string>;
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly timeoutMs: number;
 
   constructor(options: VulnifyClientOptions) {
-    if (!options.apiKey) throw new Error('Vulnify API key is required.');
-    this.apiKey = options.apiKey;
+    if (options.oauth && options.apiKey) {
+      throw new Error('Pass either an API key or an OAuth access token.');
+    }
+    if (options.oauth) {
+      if (!options.oauth.accessToken) throw new Error('OAuth access token is required.');
+      this.mode = 'oauth';
+      this.authorization = `Bearer ${options.oauth.accessToken}`;
+      this.scopes = new Set(options.oauth.scopes);
+    } else {
+      if (!options.apiKey) throw new Error('Vulnify API key is required.');
+      this.mode = 'api_key';
+      this.authorization = `Bearer ${options.apiKey}`;
+      this.scopes = new Set();
+    }
     this.baseUrl = options.baseUrl.replace(/\/+$/, '');
     this.fetchImpl = options.fetch ?? fetch;
     this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
   }
 
   listPolicies(): Promise<ApiResult> {
-    return this.request('GET', '/v1/policies');
+    return this.invoke('list_policies', 'policies:read', 'GET', '/v1/policies', '/v1/mcp/policies');
   }
 
-  testPolicies(body: unknown): Promise<ApiResult> {
-    return this.request('POST', '/v1/policies/test', body);
+  testPolicies(body: unknown, tool: 'check_action' | 'test_policies' = 'test_policies'): Promise<ApiResult> {
+    return this.invoke(tool, 'policies:test', 'POST', '/v1/policies/test', '/v1/mcp/policies/test', body);
   }
 
   planPolicyChanges(input: PlanPolicyChangesInput): Promise<ApiResult> {
-    return this.request('POST', '/v1/policies/apply', buildPlanBody(input));
+    return this.invoke('plan_policy_changes', null, 'POST', '/v1/policies/apply', null, buildPlanBody(input));
   }
 
   createEvent(body: Record<string, unknown>, idempotencyKey?: string): Promise<ApiResult> {
-    return this.request('POST', '/v1/events', defined(body), idempotencyKey);
+    return this.invoke('decide_action', 'decisions:write', 'POST', '/v1/events', '/v1/mcp/events', defined(body), idempotencyKey);
   }
 
   getEvent(id: string): Promise<ApiResult> {
-    return this.request('GET', `/v1/events/${encodeURIComponent(id)}`);
+    const encoded = encodeURIComponent(id);
+    return this.invoke('get_decision', 'decisions:read', 'GET', `/v1/events/${encoded}`, `/v1/mcp/events/${encoded}`);
   }
 
   checkMcpToolCall(body: Record<string, unknown>, idempotencyKey?: string): Promise<ApiResult> {
-    return this.request('POST', '/v1/gateway/mcp', defined(body), idempotencyKey);
+    return this.invoke(
+      'check_mcp_tool_call',
+      'decisions:write',
+      'POST',
+      '/v1/gateway/mcp',
+      null,
+      defined(body),
+      idempotencyKey,
+    );
+  }
+
+  /**
+   * API keys keep the `/v1/*` routes. OAuth tokens use `/v1/mcp/*` when that route exists.
+   * `plan_policy_changes` and `check_mcp_tool_call` have no `/v1/mcp` route, so they stay API-key only.
+   */
+  private route(tool: string, scope: string | null, apiPath: string, mcpPath: string | null): string {
+    if (this.mode === 'api_key') return apiPath;
+    if (mcpPath === null) throw new Error(oauthApiKeyOnly(tool));
+    if (!scope || !this.scopes.has(scope)) {
+      throw new Error(`This access token cannot call ${tool}. It needs the ${scope ?? 'required'} scope.`);
+    }
+    return mcpPath;
+  }
+
+  private invoke(
+    tool: string,
+    scope: string | null,
+    method: 'GET' | 'POST',
+    apiPath: string,
+    mcpPath: string | null,
+    body?: unknown,
+    idempotencyKey?: string,
+  ): Promise<ApiResult> {
+    return this.request(method, this.route(tool, scope, apiPath, mcpPath), body, idempotencyKey);
   }
 
   private async request(method: 'GET' | 'POST', path: string, body?: unknown, idempotencyKey?: string): Promise<ApiResult> {
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      Authorization: `Bearer ${this.apiKey}`,
+      Authorization: this.authorization,
     };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
