@@ -130,7 +130,7 @@ Every tool has a title and `readOnlyHint`, `destructiveHint`, `idempotentHint`, 
 | `plan_policy_changes` | `POST /v1/policies/apply` | No | true | `dryRun` is forced to true. Needs an org-wide LIVE key. |
 | `check_mcp_tool_call` | `POST /v1/gateway/mcp` | Yes | false | Maps a tool name to an action and records the decision. Does not run the tool. |
 
-`destructiveHint` is false on every tool. `openWorldHint` is true on every tool, because each call reaches the Vulnify API rather than only local data. `idempotentHint` is true for the read-only tools and false for `decide_action` and `check_mcp_tool_call`. An `idempotencyKey` makes a retry of a recorded decision return the same event.
+`destructiveHint` is false on every tool. `openWorldHint` is false on every tool, because each call stays inside the caller's own Vulnify organization. `idempotentHint` is true for the read-only tools and false for `decide_action` and `check_mcp_tool_call`. An `idempotencyKey` makes a retry of a recorded decision return the same event.
 
 Policy list, test, and plan calls are limited to 60 requests per minute per key. Batch dry runs with `test_policies`. `POST /v1/events` has its own limit. The OpenAPI text says only that the limit was exceeded.
 
@@ -187,6 +187,7 @@ Audit exports in the Vulnify app are a JSON or CSV download that includes a SHA-
 | `VULNIFY_API_KEY` | stdio process | yes | API key (`vln_live_...` or `vln_test_...`). HTTP does not fall back to this variable. |
 | `VULNIFY_BASE_URL` | both | no | API base URL. Default `https://api.vulnify.io`. |
 | `OAUTH_INTROSPECTION_SECRET` | HTTP | for user login | Bearer secret for `POST /oauth/introspect`. Stays on the server. API keys work without it. |
+| `OPENAI_APPS_CHALLENGE` | HTTP | no | When set, `GET /.well-known/openai-apps-challenge` returns this value as `text/plain`. Unset, that path is 404. |
 | `PORT` | HTTP | no | Listen port. Default `8080`. |
 | `HOST` | HTTP | no | Bind address. Default `0.0.0.0`. |
 

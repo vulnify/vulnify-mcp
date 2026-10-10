@@ -99,6 +99,7 @@ describe('HTTP server', () => {
     fetchImpl?: typeof fetch;
     introspectionSecret?: string;
     now?: () => number;
+    openaiAppsChallenge?: string;
   } = {}): Promise<string> {
     const original = process.stderr.write.bind(process.stderr);
     process.stderr.write = ((chunk: string | Uint8Array) => {
@@ -115,6 +116,7 @@ describe('HTTP server', () => {
       fetch: options.fetchImpl,
       introspectionSecret: options.introspectionSecret,
       now: options.now,
+      openaiAppsChallenge: options.openaiAppsChallenge,
       logger: (line) => {
         logs.push(line);
       },
@@ -141,6 +143,27 @@ describe('HTTP server', () => {
     assert.equal(cardBody.authentication.required, true);
     assert.deepEqual(cardBody.authentication.schemes, ['oauth2', 'bearer', 'x-vulnify-key']);
     assert.equal(cardBody.authentication.resourceMetadata, 'https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp');
+  });
+
+  it('serves the OpenAI apps challenge as text when configured', async () => {
+    const missing = await listen();
+    const absent = await fetch(`${missing}/.well-known/openai-apps-challenge`);
+    assert.equal(absent.status, 404);
+    assert.match(absent.headers.get('content-type') ?? '', /text\/plain/);
+    assert.equal(await absent.text(), 'Not found.');
+
+    const token = 'openai-challenge-token';
+    const base = await listen({ openaiAppsChallenge: `  ${token}  ` });
+    const present = await fetch(`${base}/.well-known/openai-apps-challenge`);
+    assert.equal(present.status, 200);
+    assert.match(present.headers.get('content-type') ?? '', /text\/plain/);
+    assert.equal(await present.text(), token);
+    assert.equal(present.headers.get('cache-control'), 'no-store');
+    assert.equal(logs.join('\n').includes(token), false);
+
+    const blank = await listen({ openaiAppsChallenge: 'not a single token' });
+    const rejected = await fetch(`${blank}/.well-known/openai-apps-challenge`);
+    assert.equal(rejected.status, 404);
   });
 
   it('serves the protected resource metadata without credentials', async () => {
@@ -194,7 +217,7 @@ describe('HTTP server', () => {
       assert.equal(tool.inputSchema.type, 'object');
       assert.equal(typeof tool.annotations?.readOnlyHint, 'boolean');
       assert.equal(tool.annotations?.destructiveHint, false);
-      assert.equal(tool.annotations?.openWorldHint, true);
+      assert.equal(tool.annotations?.openWorldHint, false);
       assert.equal(typeof tool.annotations?.idempotentHint, 'boolean');
     }
 

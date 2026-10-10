@@ -14,6 +14,7 @@ HTTP:             vulnify-mcp --http
   OAuth: Authorization: Bearer vln_oat_... (validated with OAUTH_INTROSPECTION_SECRET).
   API key: Authorization: Bearer <key> or X-Vulnify-Key: <key> on each request.
   GET /health does not require a key.
+  OPENAI_APPS_CHALLENGE, when set, is served at /.well-known/openai-apps-challenge.
 `;
 
 function fail(message: string): never {
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
       host,
       baseUrl,
       introspectionSecret: process.env.OAUTH_INTROSPECTION_SECRET,
+      openaiAppsChallenge: process.env.OPENAI_APPS_CHALLENGE,
     });
     process.stderr.write(`vulnify-mcp listening on ${host}:${port}\n`);
     return;

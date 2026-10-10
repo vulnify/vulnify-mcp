@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { DEFAULT_POLL_MS } from './constants.js';
+import { sanitizeToolPayload, stripCommerceLinks } from './errors.js';
 import { redact } from './redact.js';
 import {
   checkActionInput,
@@ -31,8 +32,8 @@ interface ToolAnnotations {
   openWorldHint: boolean;
 }
 
-/** True because every tool calls the Vulnify API, an external system, rather than only local data. */
-const OPEN_WORLD = true;
+/** False because every tool acts on the caller's own Vulnify organization. */
+const OPEN_WORLD = false;
 
 function annotations(title: string, readOnly: boolean, idempotent: boolean): ToolAnnotations {
   return {
@@ -45,15 +46,16 @@ function annotations(title: string, readOnly: boolean, idempotent: boolean): Too
 }
 
 function toolResult(value: Record<string, unknown>): CallToolResult {
+  const clean = sanitizeToolPayload(value) as Record<string, unknown>;
   return {
-    content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
-    structuredContent: value,
+    content: [{ type: 'text', text: JSON.stringify(clean, null, 2) }],
+    structuredContent: clean,
   };
 }
 
 function toolError(err: unknown): CallToolResult {
   const message = err instanceof Error ? redact(err.message) : 'Vulnify request failed.';
-  return { isError: true, content: [{ type: 'text', text: message }] };
+  return { isError: true, content: [{ type: 'text', text: stripCommerceLinks(message) }] };
 }
 
 async function run(fn: () => Promise<Record<string, unknown>>): Promise<CallToolResult> {
