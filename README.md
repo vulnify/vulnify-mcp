@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/banner.png" alt="Decide every AI agent action before it runs. ALLOW, REVIEW, or BLOCK, with the reasons and the proof." width="720" />
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/banner.png" alt="Every agent action gets a decision. ALLOW, REVIEW, or BLOCK." width="800" />
 </p>
 
 `@vulnify/mcp` is the MCP server for [Vulnify](https://docs.vulnify.io), a runtime authorization layer for AI agents. The agent asks first. This process proxies `https://api.vulnify.io`. It does not store events or API keys.
@@ -136,18 +136,14 @@ API-key IP allowlists are checked against the hosted server's egress IP when usi
 
 ## Product
 
-Screenshots are from a demo workspace. Agent names are `SalesBot` and `SupportBot`.
+Screenshots are from a demo workspace. The agent in the decision card is `SupportBot`.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/audit-logs.png" alt="Audit log listing two allowed decisions for SalesBot and SupportBot." width="720" />
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/audit-logs.png" alt="Audit chain check. Entries are append-only and chained with SHA-256. The chain is intact." width="800" />
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/block-detail.png" alt="A blocked export: SalesBot, 12,000 records, external email, critical risk." width="720" />
-</p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/allow-detail.png" alt="An allowed read: SupportBot, one record, internal destination, low risk." width="720" />
+  <img src="https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/.github/assets/allow-detail.png" alt="An allowed read: SupportBot, one record, internal destination, low risk." width="800" />
 </p>
 
 Audit exports in the Vulnify app are a JSON or CSV download that includes a SHA-256 checksum. SIEM export is JSON or CEF lines.
