@@ -17,6 +17,7 @@ export interface ServerCardTool {
   title?: string;
   description?: string;
   inputSchema: Tool['inputSchema'];
+  annotations?: Tool['annotations'];
 }
 
 export interface ServerCard {
@@ -76,12 +77,13 @@ async function listedTools(): Promise<Tool[]> {
   }
 }
 
-function cardTool(tool: Pick<Tool, 'name' | 'title' | 'description' | 'inputSchema'>): ServerCardTool {
+function cardTool(tool: Pick<Tool, 'name' | 'title' | 'description' | 'inputSchema' | 'annotations'>): ServerCardTool {
   return {
     name: tool.name,
     ...(tool.title ? { title: tool.title } : {}),
     ...(tool.description ? { description: tool.description } : {}),
     inputSchema: tool.inputSchema,
+    ...(tool.annotations ? { annotations: tool.annotations } : {}),
   };
 }
 

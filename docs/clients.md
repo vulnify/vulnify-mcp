@@ -1,12 +1,14 @@
 # Use Vulnify with Cursor, Claude, Grok or your code
 
-The Vulnify MCP server lets an agent ask whether an action may run. Run it locally with `npx -y @vulnify/mcp` and `VULNIFY_API_KEY`, or connect to the hosted server at `https://mcp.vulnify.io/mcp`. The guide is at [https://docs.vulnify.io/mcp/](https://docs.vulnify.io/mcp/).
+The Vulnify MCP server lets an agent ask whether an action may run. Sign in at `https://mcp.vulnify.io/mcp`, or run it locally with `npx -y @vulnify/mcp` and `VULNIFY_API_KEY`. The guide is at [https://docs.vulnify.io/mcp/](https://docs.vulnify.io/mcp/).
 
 `check_action` previews a decision. It skips the PII scan and records nothing. `decide_action` records a decision. A `REVIEW` is not approval. This server cannot approve or deny a review.
 
-Create a dedicated TEST key (`vln_test_...`) to try an API-key client. Set `VULNIFY_BASE_URL` only when the API is not `https://api.vulnify.io`.
+Claude custom connector: add `https://mcp.vulnify.io/mcp` and sign in. See [Claude custom connector](#claude-custom-connector).
 
-A Claude custom connector does not use a key. Add the URL and sign in. See [Claude custom connector](#claude-custom-connector). API-key snippets for Cursor, Claude Code, Claude Desktop, and VS Code are below. Hosted API-key snippets are in [Remote URL](#remote-url).
+Cursor: [Install Vulnify](cursor://anysphere.cursor-deeplink/mcp/install?name=vulnify&config=eyJ1cmwiOiJodHRwczovL21jcC52dWxuaWZ5LmlvL21jcCJ9).
+
+Create a dedicated TEST key (`vln_test_...`) for a manual API-key config. Set `VULNIFY_BASE_URL` only when the API is not `https://api.vulnify.io`. API-key snippets for Cursor, Claude Code, Claude Desktop, and VS Code are below. Hosted API-key snippets are in [Remote URL](#remote-url).
 
 ## Cursor
 
@@ -139,7 +141,7 @@ Do not enter an API key. Claude calls that URL, reads the 401 `WWW-Authenticate`
 | `get_decision` | `decisions:read` |
 | `list_policies` | `policies:read` |
 
-`plan_policy_changes` and `check_mcp_tool_call` need an API key. An OAuth session gets an error that says so. This server has no approve tool and no deny tool.
+An OAuth `tools/list` returns those five tools. `plan_policy_changes` and `check_mcp_tool_call` stay on API-key and stdio sessions. This server has no approve tool and no deny tool.
 
 ## Remote URL
 
@@ -150,10 +152,10 @@ API-key IP allowlists are checked against the hosted server's egress IP when usi
 The server does not keep a session. Send the key on every API-key request. A request with no credentials gets 401 and:
 
 ```
-WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp"
+WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"
 ```
 
-`GET /health` does not require a key. `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-protected-resource/mcp` return the same protected-resource JSON the API serves.
+`GET /health` does not require a key. `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-protected-resource/mcp` return this server's protected-resource JSON, with `scopes_supported` set to those four scopes.
 
 ### Cursor
 
@@ -170,7 +172,7 @@ WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="
 }
 ```
 
-The Cursor plugin in this repo (`.cursor-plugin/plugin.json`) points at the remote URL and declares `VULNIFY_API_KEY` as a variable. Set the key in Cursor under Plugins → Configure. The value is not stored in the repo.
+The Cursor plugin in this repo (`.cursor-plugin/plugin.json`) points at `https://mcp.vulnify.io/mcp` and signs in with Vulnify. The JSON above is a manual API-key config. The deeplink is [Install Vulnify](cursor://anysphere.cursor-deeplink/mcp/install?name=vulnify&config=eyJ1cmwiOiJodHRwczovL21jcC52dWxuaWZ5LmlvL21jcCJ9).
 
 ### Claude Code
 
@@ -201,6 +203,6 @@ Prefer an environment variable over a key written into the shell history when yo
 - URL: `https://mcp.vulnify.io/mcp`
 - OAuth: no header. The client signs in and sends `Authorization: Bearer vln_oat_...`
 - API key header: `Authorization: Bearer <api-key>` or `X-Vulnify-Key: <api-key>`
-- Missing credentials: HTTP 401, with `WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp"`
+- Missing credentials: HTTP 401, with `WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"`
 - A refresh token (`vln_ort_...`), a `vln_oac_...` credential, an unrecognized secret, or an API key the API rejects: HTTP 401, with that same challenge and `error="invalid_token"`
 - Health check, no credentials: `GET https://mcp.vulnify.io/health`

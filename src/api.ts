@@ -88,6 +88,11 @@ export class VulnifyClient {
     this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
   }
 
+  /** True for `vln_live_...` and `vln_test_...` sessions, including stdio. */
+  usesApiKey(): boolean {
+    return this.mode === 'api_key';
+  }
+
   listPolicies(): Promise<ApiResult> {
     return this.invoke('list_policies', 'policies:read', 'GET', '/v1/policies', '/v1/mcp/policies');
   }

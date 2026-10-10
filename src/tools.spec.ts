@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { buildPlanBody, VulnifyClient } from './api.js';
-import { DEFAULT_BASE_URL, INSTRUCTIONS, VERSION } from './constants.js';
+import { DEFAULT_BASE_URL, INSTRUCTIONS, OAUTH_INSTRUCTIONS, VERSION } from './constants.js';
 import { createVulnifyServer } from './server.js';
 import { readFileSync } from 'node:fs';
 
@@ -100,6 +100,27 @@ describe('plan body', () => {
 });
 
 describe('tools', () => {
+  it('lists the five OAuth tools and keeps the API-key tools on an API-key session', async () => {
+    const oauthClient = new VulnifyClient({
+      baseUrl: BASE,
+      oauth: { accessToken: 'vln_oat_unit_access_token', scopes: ['policies:read', 'policies:test', 'decisions:read', 'decisions:write'] },
+      fetch: async () => jsonResponse(200, {}),
+    });
+    const server = createVulnifyServer({ client: oauthClient });
+    const mcp = new Client({ name: 'oauth-tools', version: '0.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await mcp.connect(clientTransport);
+    try {
+      const names = (await mcp.listTools()).tools.map((tool) => tool.name).sort();
+      assert.deepEqual(names, ['check_action', 'decide_action', 'get_decision', 'list_policies', 'test_policies']);
+      assert.equal(mcp.getInstructions(), OAUTH_INSTRUCTIONS);
+    } finally {
+      await mcp.close();
+      await server.close();
+    }
+  });
+
   it('publishes a title and the four behavior hints for every tool', async () => {
     const { fetch: fetchImpl } = installFetch(() => jsonResponse(200, { results: [] }));
     const { mcp, close } = await withClient(fetchImpl);
@@ -130,6 +151,9 @@ describe('tools', () => {
       }
       assert.doesNotMatch(INSTRUCTIONS, /obey/i);
       assert.doesNotMatch(INSTRUCTIONS, /do not run/i);
+      assert.doesNotMatch(OAUTH_INSTRUCTIONS, /obey/i);
+      assert.doesNotMatch(OAUTH_INSTRUCTIONS, /check_mcp_tool_call/);
+      assert.doesNotMatch(OAUTH_INSTRUCTIONS, /plan_policy_changes/);
       const plan = byName.get('plan_policy_changes');
       assert.equal(plan?.inputSchema.properties?.dryRun, undefined);
       assert.match(byName.get('check_action')?.description ?? '', /skips the PII scan/);

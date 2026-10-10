@@ -18,22 +18,19 @@ export const MCP_RESOURCE = 'https://mcp.vulnify.io/mcp';
 export const OAUTH_ISSUER = 'https://api.vulnify.io';
 export const PROTECTED_RESOURCE_METADATA_URL = 'https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp';
 
+/** Scopes this MCP server asks for. The authorization server may advertise a wider set. */
+export const MCP_OAUTH_SCOPES = ['decisions:read', 'decisions:write', 'policies:read', 'policies:test'] as const;
+export const MCP_OAUTH_SCOPE = MCP_OAUTH_SCOPES.join(' ');
+
 /**
- * Same document as GET https://api.vulnify.io/.well-known/oauth-protected-resource.
- * Served locally so clients can discover the authorization server when the API is slow.
+ * Protected-resource metadata for https://mcp.vulnify.io/mcp.
+ * scopes_supported is the least privilege the hosted tools use.
+ * Served locally so discovery does not depend on the API.
  */
 export const PROTECTED_RESOURCE_METADATA = {
   resource: MCP_RESOURCE,
   authorization_servers: [OAUTH_ISSUER],
-  scopes_supported: [
-    'decisions:read',
-    'decisions:write',
-    'policies:read',
-    'policies:test',
-    'reviews:read',
-    'reviews:decide',
-    'audit:read',
-  ],
+  scopes_supported: [...MCP_OAUTH_SCOPES],
   bearer_methods_supported: ['header'],
 } as const;
 
@@ -41,6 +38,16 @@ export const INSTRUCTIONS = [
   'Vulnify is a runtime authorization layer. The finalDecision field is the authoritative result: ALLOW, REVIEW, or BLOCK.',
   'check_action previews a decision. It skips the PII scan and records nothing.',
   'decide_action and check_mcp_tool_call record a decision. check_action is the preview and records nothing.',
+  'REVIEW means a human decides. This server cannot approve or deny a review.',
+  'When finalDecision is REVIEW, get_decision can poll until it is ALLOW or BLOCK.',
+  'A tool error does not include finalDecision. finalDecision is present on a successful decision.',
+].join(' ');
+
+/** Instructions for an OAuth session, which does not list the API-key-only tools. */
+export const OAUTH_INSTRUCTIONS = [
+  'Vulnify is a runtime authorization layer. The finalDecision field is the authoritative result: ALLOW, REVIEW, or BLOCK.',
+  'check_action previews a decision. It skips the PII scan and records nothing.',
+  'decide_action records a decision. check_action is the preview and records nothing.',
   'REVIEW means a human decides. This server cannot approve or deny a review.',
   'When finalDecision is REVIEW, get_decision can poll until it is ALLOW or BLOCK.',
   'A tool error does not include finalDecision. finalDecision is present on a successful decision.',

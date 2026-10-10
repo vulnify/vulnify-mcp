@@ -16,19 +16,11 @@ const TOKEN = 'vln_oat_http_access_token';
 const WRITER = 'vln_oat_http_writer_token';
 const SECRET = 'introspection-secret-for-tests';
 const CHALLENGE =
-  'Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp"';
+  'Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"';
 const PROTECTED_RESOURCE = {
   resource: 'https://mcp.vulnify.io/mcp',
   authorization_servers: ['https://api.vulnify.io'],
-  scopes_supported: [
-    'decisions:read',
-    'decisions:write',
-    'policies:read',
-    'policies:test',
-    'reviews:read',
-    'reviews:decide',
-    'audit:read',
-  ],
+  scopes_supported: ['decisions:read', 'decisions:write', 'policies:read', 'policies:test'],
   bearer_methods_supported: ['header'],
 };
 
@@ -194,11 +186,16 @@ describe('HTTP server', () => {
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
       })),
     );
     for (const tool of cardBody.tools) {
       assert.equal(typeof tool.description, 'string');
       assert.equal(tool.inputSchema.type, 'object');
+      assert.equal(typeof tool.annotations?.readOnlyHint, 'boolean');
+      assert.equal(tool.annotations?.destructiveHint, false);
+      assert.equal(tool.annotations?.openWorldHint, true);
+      assert.equal(typeof tool.annotations?.idempotentHint, 'boolean');
     }
 
     assert.equal(cardBody.authentication.required, true);
@@ -417,9 +414,8 @@ describe('HTTP server', () => {
     });
     const client = new Client({ name: 'oauth-test', version: '0.0.0' });
     await client.connect(transport);
-    const names = (await client.listTools()).tools.map((tool) => tool.name);
-    assert.equal(names.includes('approve_review'), false);
-    assert.equal(names.includes('deny_review'), false);
+    const names = (await client.listTools()).tools.map((tool) => tool.name).sort();
+    assert.deepEqual(names, ['check_action', 'decide_action', 'get_decision', 'list_policies', 'test_policies']);
 
     const listed = await client.callTool({ name: 'list_policies', arguments: {} });
     assert.equal(listed.isError, true);
@@ -449,16 +445,6 @@ describe('HTTP server', () => {
 
     const got = await client.callTool({ name: 'get_decision', arguments: { id: 'evt_1' } });
     assert.notEqual(got.isError, true);
-
-    const planned = await client.callTool({ name: 'plan_policy_changes', arguments: { policies: [] } });
-    assert.equal(planned.isError, true);
-    assert.match(textOf(planned), /API key/);
-    assert.match(textOf(planned), /policy apply/);
-
-    const gateway = await client.callTool({ name: 'check_mcp_tool_call', arguments: { tool: 'export_customers' } });
-    assert.equal(gateway.isError, true);
-    assert.match(textOf(gateway), /API key/);
-    assert.match(textOf(gateway), /MCP gateway/);
 
     await client.close();
     await transport.close();
@@ -610,6 +596,25 @@ describe('HTTP server', () => {
     assert.equal(body.includes(KEY), false);
     assert.equal((await postInitialize(base, KEY)).status, 503);
     assert.equal(calls, 2);
+  });
+});
+
+describe('cursor plugin', () => {
+  it('connects with OAuth and does not ask for an API key', () => {
+    const plugin = JSON.parse(readFileSync(new URL('../.cursor-plugin/plugin.json', import.meta.url), 'utf8')) as {
+      version: string;
+      description: string;
+      homepage: string;
+      author: { name: string; email: string };
+      variables?: unknown;
+    };
+    const mcp = JSON.parse(readFileSync(new URL('../mcp.json', import.meta.url), 'utf8')) as unknown;
+    assert.equal(plugin.version, '0.1.3');
+    assert.match(plugin.description, /Sign in with Vulnify/);
+    assert.equal(plugin.author.email, 'contact@vulnify.io');
+    assert.equal(plugin.homepage, 'https://docs.vulnify.io/mcp/');
+    assert.equal(plugin.variables, undefined);
+    assert.deepEqual(mcp, { mcpServers: { vulnify: { url: 'https://mcp.vulnify.io/mcp' } } });
   });
 });
 
