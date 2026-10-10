@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "vulnify": {
+      "command": "npx",
+      "args": ["-y", "@vulnify/mcp"],
+      "env": {
+        "VULNIFY_API_KEY": "${env:VULNIFY_API_KEY}"
+      }
+    }
+  }
+}

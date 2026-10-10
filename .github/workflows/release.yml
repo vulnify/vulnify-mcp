@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Do not set registry-url. setup-node then writes
+      # //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN} and, when no token
+      # is configured, exports the placeholder NODE_AUTH_TOKEN=XXXXX-XXXXX-XXXXX-XXXXX.
+      # npm treats that as registry auth and skips the OIDC exchange. A scoped
+      # publish then fails with E404. Trusted publishing needs no registry token.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      # Trusted publishing requires npm >= 11.5.1. Node 22's bundled npm may be older.
+      - name: Install npm with trusted publishing support
+        run: |
+          npm install -g npm@11
+          ver="$(npm -v)"
+          echo "npm ${ver}"
+          node -e 'const [major, minor, patch] = process.argv[1].split(".").map(Number); if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) { console.error("npm " + process.argv[1] + " is older than 11.5.1"); process.exit(1); }' "$ver"
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+      - name: Require the tag to match package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match package.json version ${pkg}. Refusing to publish."
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches package.json ${pkg}"
+
+      - run: npm run check:package
+
+      - name: Generate CycloneDX SBOM
+        run: npm exec -- cyclonedx-npm --omit dev --mc-type library --output-reproducible --validate --output-file sbom.cdx.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
+          if-no-files-found: error
+
+      # OIDC trusted publishing. Do not set NODE_AUTH_TOKEN or NPM_TOKEN.
+      # Provenance is also generated automatically for trusted publishes from a public repo;
+      # --provenance is passed explicitly so the attestation is requested either way.
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ""
+        run: |
+          if [ -n "${NPM_CONFIG_USERCONFIG:-}" ] && [ -f "$NPM_CONFIG_USERCONFIG" ]; then
+            sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
+          fi
+          unset NODE_AUTH_TOKEN
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NODE_AUTH_TOKEN is set. Trusted publishing must not send a registry token."
+            exit 1
+          fi
+          npm publish --provenance --access public
+
+      - name: Attach the SBOM to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" sbom.cdx.json --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" sbom.cdx.json \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
+
+      # io.vulnify/mcp needs DNS or HTTP auth on vulnify.io. GitHub OIDC only
+      # grants io.github.vulnify/*. Skip until the owner adds MCP_PRIVATE_KEY.
+      # continue-on-error keeps an auth failure from failing the npm publish.
+      - name: Publish to the MCP Registry
+        continue-on-error: true
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_PRIVATE_KEY }}
+        run: |
+          if [ -z "${MCP_PRIVATE_KEY}" ]; then
+            echo "Skipping MCP Registry publish."
+            echo "io.vulnify/mcp needs DNS or HTTP auth on vulnify.io before mcp-publisher can log in."
+            echo "After that, set the MCP_PRIVATE_KEY secret to the Ed25519 key from: mcp-publisher login dns --domain vulnify.io"
+            exit 0
+          fi
+          curl -fsSL -o mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz"
+          tar -xzf mcp-publisher.tar.gz mcp-publisher
+          ./mcp-publisher login dns --domain vulnify.io --private-key "$MCP_PRIVATE_KEY"
+          ./mcp-publisher publish

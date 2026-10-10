@@ -1,0 +1,70 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.vulnify/mcp",
+  "title": "Vulnify",
+  "description": "Ask Vulnify before an AI agent acts. Check, record, and read policy decisions.",
+  "version": "0.1.0",
+  "websiteUrl": "https://docs.vulnify.io",
+  "repository": {
+    "url": "https://github.com/vulnify/vulnify-mcp",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/vulnify/vulnify-mcp/main/assets/logo.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": ["any"],
+      "theme": "dark"
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@vulnify/mcp",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "VULNIFY_API_KEY",
+          "description": "Vulnify API key (vln_live_... or vln_test_...).",
+          "isRequired": true,
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "VULNIFY_BASE_URL",
+          "description": "API base URL. Defaults to https://api.vulnify.io.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "string"
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.vulnify.io/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Vulnify API key as a Bearer token.",
+          "isRequired": true,
+          "isSecret": true,
+          "value": "Bearer {api_key}",
+          "variables": {
+            "api_key": {
+              "description": "Vulnify API key (vln_live_... or vln_test_...).",
+              "isRequired": true,
+              "isSecret": true,
+              "format": "string"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

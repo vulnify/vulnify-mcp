@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "vulnify": {
+      "url": "https://mcp.vulnify.io/mcp",
+      "headers": {
+        "Authorization": "Bearer ${VULNIFY_API_KEY}"
+      }
+    }
+  }
+}

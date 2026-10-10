@@ -1,0 +1,27 @@
+{
+  "name": "vulnify",
+  "version": "0.1.0",
+  "description": "Runtime authorization for AI agents. Ask Vulnify before an action runs.",
+  "author": {
+    "name": "Vulnify"
+  },
+  "homepage": "https://docs.vulnify.io",
+  "repository": "https://github.com/vulnify/vulnify-mcp",
+  "license": "MIT",
+  "keywords": ["vulnify", "vulnify-mcp", "runtime-authorization"],
+  "logo": "assets/logo.svg",
+  "skills": "./skills/",
+  "rules": "./rules/",
+  "mcpServers": "./mcp.json",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "VULNIFY_API_KEY": {
+        "type": "string",
+        "title": "Vulnify API key",
+        "description": "API key (vln_test_... or vln_live_...). Sent as Authorization: Bearer on each request. Use a dedicated TEST key to try the server."
+      }
+    },
+    "required": ["VULNIFY_API_KEY"]
+  }
+}
