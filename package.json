@@ -5,10 +5,16 @@
   "keywords": [
     "vulnify",
     "mcp",
+    "mcp-server",
+    "model-context-protocol",
     "authorization",
     "security",
     "ai-agents",
-    "model-context-protocol"
+    "agent-security",
+    "guardrails",
+    "human-in-the-loop",
+    "claude",
+    "cursor"
   ],
   "homepage": "https://docs.vulnify.io",
   "bugs": {
