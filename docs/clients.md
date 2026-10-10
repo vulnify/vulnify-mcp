@@ -1,6 +1,6 @@
 # Use Vulnify with Cursor, Claude, Grok or your code
 
-The Vulnify MCP server lets an agent ask whether an action may run. The install that works today is local stdio: `npx -y @vulnify/mcp` with `VULNIFY_API_KEY`.
+The Vulnify MCP server lets an agent ask whether an action may run. Run it locally with `npx -y @vulnify/mcp` and `VULNIFY_API_KEY`, or connect to the hosted server at `https://mcp.vulnify.io/mcp`. The guide is at [https://docs.vulnify.io/mcp/](https://docs.vulnify.io/mcp/).
 
 `check_action` previews a decision. It skips the PII scan and records nothing. `decide_action` records a decision. A `REVIEW` is not approval. This server cannot approve or deny a review.
 
@@ -8,7 +8,7 @@ Create a dedicated TEST key (`vln_test_...`) to try a client. Set `VULNIFY_BASE_
 
 One-click Grok connectors and the Claude connectors directory are not available for this server. They authenticate with OAuth only. OAuth is planned for v1.1. The client sections below are only the clients where an API-key MCP server works today.
 
-The hosted URL `https://mcp.vulnify.io/mcp` is not live yet. Every snippet that uses it is in [Remote URL (not live yet)](#remote-url-not-live-yet), so this page can be split there.
+Hosted snippets are in [Remote URL](#remote-url).
 
 ## Cursor
 
@@ -123,7 +123,7 @@ If the SDK cannot reach Vulnify, the default is a fail-closed decision, not a th
 
 API-key IP allowlists are checked against the hosted server's egress IP when using `https://mcp.vulnify.io/mcp`, not the end user's IP. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`) instead.
 
-Do not put the API key in a tool argument, a URL, or a committed config file. The local process reads `VULNIFY_API_KEY` from the environment. The hosted server, once it is deployed, reads `Authorization: Bearer <key>` or `X-Vulnify-Key` on each request and does not log the key.
+Do not put the API key in a tool argument, a URL, or a committed config file. The local process reads `VULNIFY_API_KEY` from the environment. The hosted server reads `Authorization: Bearer <key>` or `X-Vulnify-Key` on each request and does not log the key.
 
 ## Not in this version
 
@@ -131,9 +131,9 @@ Grok Bot custom connectors, and the Claude connectors directory, authenticate wi
 
 OAuth on the MCP host is planned for v1.1. Until then, use Cursor, Claude Code, Claude Desktop via `npx`, VS Code, another local stdio client, or `@vulnify/sdk`.
 
-## Remote URL (not live yet)
+## Remote URL
 
-Everything from this heading down uses `https://mcp.vulnify.io/mcp`. That host is not deployed yet. Keep this section together so the page can be published without it.
+These snippets connect to the hosted server at `https://mcp.vulnify.io/mcp`.
 
 API-key IP allowlists are checked against the hosted server's egress IP when using `https://mcp.vulnify.io/mcp`, not the end user's IP. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`) instead.
 
@@ -154,7 +154,7 @@ The server does not keep a session. Send the key on every request. A request wit
 }
 ```
 
-The Cursor plugin in this repo (`.cursor-plugin/plugin.json`) points at the remote URL and declares `VULNIFY_API_KEY` as a variable. Set the key in Cursor under Plugins → Configure. The value is not stored in the repo. The plugin is not usable until the URL is deployed.
+The Cursor plugin in this repo (`.cursor-plugin/plugin.json`) points at the remote URL and declares `VULNIFY_API_KEY` as a variable. Set the key in Cursor under Plugins → Configure. The value is not stored in the repo.
 
 ### Claude Code
 

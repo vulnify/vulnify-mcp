@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <a href="https://docs.vulnify.io">Docs</a>
+  <a href="https://docs.vulnify.io/mcp/">Docs</a>
   &nbsp;·&nbsp;
   <a href="https://github.com/vulnify/vulnify-mcp">MCP</a>
   &nbsp;·&nbsp;
@@ -35,7 +35,7 @@
 Two transports, one server:
 
 - **stdio** for a local client: `npx -y @vulnify/mcp`
-- **stateless Streamable HTTP** at `/mcp`, intended to be deployed at `https://mcp.vulnify.io/mcp`
+- **stateless Streamable HTTP** at [`https://mcp.vulnify.io/mcp`](https://mcp.vulnify.io/mcp)
 
 `check_action` is a dry run. It skips the PII scan and records nothing. `decide_action` records a real decision. A `REVIEW` waits for a person. This server cannot approve or deny one.
 
@@ -43,7 +43,7 @@ Application code that should decide inside your own process uses the [Node SDK](
 
 ## Quickstart
 
-Node.js 20 or newer. Use a dedicated **TEST** key (`vln_test_...`) to try a client. Client snippets for Cursor, Claude Code, Claude Desktop, and VS Code are in [docs/clients.md](docs/clients.md).
+Node.js 20 or newer. Use a dedicated **TEST** key (`vln_test_...`) to try a client. The hosted guide is [docs.vulnify.io/mcp](https://docs.vulnify.io/mcp/). Client snippets for Cursor, Claude Code, Claude Desktop, and VS Code are in [docs/clients.md](docs/clients.md).
 
 ### Local stdio
 
@@ -69,7 +69,7 @@ Cursor (`.cursor/mcp.json`):
 
 ### Remote Streamable HTTP
 
-`https://mcp.vulnify.io/mcp` is not deployed yet. When it is, send the API key on every request. The server keeps no session.
+[`https://mcp.vulnify.io/mcp`](https://mcp.vulnify.io/mcp) is the hosted server. Send the API key on every request. The server keeps no session.
 
 ```json
 {
@@ -86,7 +86,7 @@ Cursor (`.cursor/mcp.json`):
 
 `X-Vulnify-Key: <key>` is accepted as well. A request with no key gets **401** and `WWW-Authenticate: Bearer`. `GET /health` does not require a key. Responses are JSON.
 
-One-click Grok connectors and the Claude connectors directory authenticate with OAuth. This server does not implement OAuth yet (planned for v1.1), so there is no one-click install for those products. Use `npx -y @vulnify/mcp` with Cursor, Claude Code, Claude Desktop, or VS Code. Remote-URL snippets are kept in their own section of [docs/clients.md](docs/clients.md#remote-url-not-live-yet).
+One-click Grok connectors and the Claude connectors directory authenticate with OAuth. This server does not implement OAuth yet (planned for v1.1), so there is no one-click install for those products. Use `npx -y @vulnify/mcp` with Cursor, Claude Code, Claude Desktop, or VS Code. Remote snippets are in [docs/clients.md](docs/clients.md#remote-url).
 
 ## How it works
 
@@ -206,7 +206,7 @@ This package does not run a shell and does not register hooks. Do not put a key 
 Network endpoints this process uses:
 
 - `https://api.vulnify.io` (or `VULNIFY_BASE_URL`) for every tool call. The key is sent as `Authorization: Bearer`.
-- `https://mcp.vulnify.io/mcp` is where the HTTP transport is meant to be deployed. The server process does not call that URL.
+- `https://mcp.vulnify.io/mcp` is the hosted HTTP transport. The server process does not call that URL.
 
 ## Development
 
