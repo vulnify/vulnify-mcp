@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Hosted HTTP accepts OAuth 2.1 user access tokens (`vln_oat_...`) and still accepts `vln_live_` / `vln_test_` API keys. A request with no credentials returns 401 with the protected-resource `WWW-Authenticate` challenge. `plan_policy_changes` and `check_mcp_tool_call` stay API-key only.
+- Tool descriptions state that `finalDecision` is the authoritative result. Every tool keeps its title, `readOnlyHint`, and `destructiveHint`. `openWorldHint` is true because each tool calls the Vulnify API.
 
 ## 0.1.2
 

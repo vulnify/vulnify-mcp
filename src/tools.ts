@@ -31,6 +31,7 @@ interface ToolAnnotations {
   openWorldHint: boolean;
 }
 
+/** True because every tool calls the Vulnify API, an external system, rather than only local data. */
 const OPEN_WORLD = true;
 
 function annotations(title: string, readOnly: boolean, idempotent: boolean): ToolAnnotations {
@@ -88,7 +89,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     {
       title: 'Check action',
       description:
-        'Dry-run a proposed action against the organization policies (POST /v1/policies/test, one case, stored policies). This skips the PII scan and records nothing: no security event and no audit entry. There is no content field and no DLP scan. The result has no event id and no finalDecision. Use decide_action when the decision must be recorded. Dry runs are limited to 60 requests per minute per key; batch with test_policies.',
+        'Dry-run a proposed action against the organization policies (POST /v1/policies/test, one case, stored policies). This skips the PII scan and records nothing: no security event and no audit entry. There is no content field and no DLP scan. The result has no event id and no finalDecision. decide_action is the call that records a decision. Dry runs are limited to 60 requests per minute per key. test_policies covers up to 200 cases in one call.',
       inputSchema: checkActionInput,
       annotations: annotations('Check action', true, true),
     },
@@ -109,7 +110,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     {
       title: 'Decide action',
       description:
-        'Ask Vulnify for a real decision and record it (POST /v1/events). This writes a security event and an audit entry, counts toward the organization quota, and may open a human review. Obey finalDecision. decision is what was stored and does not change when a review is resolved. finalDecision stays REVIEW until a human approves, denies, or the review expires. This tool does not approve the review. A REVIEW or BLOCK means do not run the action. Optional content is scanned in memory and is not stored. Pass idempotencyKey to make a retry return the same event.',
+        'Records a decision for a proposed action (POST /v1/events). This writes a security event and an audit entry, counts toward the organization quota, and may open a human review. The finalDecision field is the authoritative result. decision is what was stored and does not change when a review is resolved. finalDecision stays REVIEW until a human approves, denies, or the review expires. This tool does not approve the review. A REVIEW or BLOCK finalDecision means the action was not allowed. Optional content is scanned in memory and is not stored. An idempotencyKey makes a retry return the same event.',
       inputSchema: decideActionInput,
       annotations: annotations('Decide action', false, false),
     },
@@ -126,7 +127,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     {
       title: 'Get decision',
       description:
-        'Read a recorded decision (GET /v1/events/{id}), including a REVIEW. finalDecision is REVIEW while the review is pending, then ALLOW after approval or BLOCK after denial or expiry. decision itself does not change. Set waitMs to poll until finalDecision is ALLOW or BLOCK, or the bounded wait elapses (30 seconds maximum). waitTimedOut is true when the wait ended and finalDecision is still REVIEW. This does not approve or deny the review.',
+        'Read a recorded decision (GET /v1/events/{id}), including a REVIEW. finalDecision is REVIEW while the review is pending, then ALLOW after approval or BLOCK after denial or expiry. decision itself does not change. The finalDecision field is the authoritative result. waitMs polls until finalDecision is ALLOW or BLOCK, or until the bounded wait elapses (30 seconds maximum). waitTimedOut is true when the wait ended and finalDecision is still REVIEW. This does not approve or deny the review.',
       inputSchema: getDecisionInput,
       annotations: annotations('Get decision', true, true),
     },
@@ -172,7 +173,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     {
       title: 'Test policies',
       description:
-        'Evaluate up to 200 policy cases without recording an event (POST /v1/policies/test). When policies is omitted, the enabled stored policies are used. When policies is set, those proposed policies are evaluated instead and nothing is written. This skips the PII scan: cases have no content field. pass is null when a case omits expect. Prefer this over repeated check_action calls. Limited to 60 requests per minute per key.',
+        'Evaluate up to 200 policy cases without recording an event (POST /v1/policies/test). When policies is omitted, the enabled stored policies are used. When policies is set, those proposed policies are evaluated instead and nothing is written. This skips the PII scan: cases have no content field. pass is null when a case omits expect. One call covers up to 200 cases. Limited to 60 requests per minute per key.',
       inputSchema: testPoliciesInput,
       annotations: annotations('Test policies', true, true),
     },
@@ -204,7 +205,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     {
       title: 'Check MCP tool call',
       description:
-        'Decide a downstream MCP tool call and record it (POST /v1/gateway/mcp). Vulnify maps the tool name to an action by substring and returns the same recorded decision as decide_action, including an id. This writes a security event and an audit entry. The tool arguments are not executed. Obey finalDecision. REVIEW or BLOCK means do not run the downstream tool. This server cannot approve the review. Pass idempotencyKey so a retry does not record a second event.',
+        'Records a decision for a downstream MCP tool call (POST /v1/gateway/mcp). Vulnify maps the tool name to an action by substring and returns the same recorded decision as decide_action, including an id. This writes a security event and an audit entry. The tool arguments are not executed. The finalDecision field is the authoritative result. A REVIEW or BLOCK finalDecision means the downstream tool was not allowed. This server cannot approve the review. An idempotencyKey makes a retry return the same event.',
       inputSchema: checkMcpToolCallInput,
       annotations: annotations('Check MCP tool call', false, false),
     },

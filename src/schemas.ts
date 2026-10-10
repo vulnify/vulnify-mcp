@@ -170,7 +170,7 @@ export const getDecisionInput = z
       .min(0)
       .max(MAX_WAIT_MS)
       .optional()
-      .describe(`When finalDecision is REVIEW, poll until it becomes ALLOW or BLOCK, or until this many milliseconds pass. Maximum ${MAX_WAIT_MS}. Omit or 0 to return the current decision immediately.`),
+      .describe(`When finalDecision is REVIEW, the server polls until finalDecision is ALLOW or BLOCK, or until this many milliseconds pass. Maximum ${MAX_WAIT_MS}. 0, or omitting the field, returns the current decision immediately.`),
     pollIntervalMs: z
       .number()
       .int()
