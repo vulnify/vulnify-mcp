@@ -202,4 +202,5 @@ Prefer an environment variable over a key written into the shell history when yo
 - OAuth: no header. The client signs in and sends `Authorization: Bearer vln_oat_...`
 - API key header: `Authorization: Bearer <api-key>` or `X-Vulnify-Key: <api-key>`
 - Missing credentials: HTTP 401, with `WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp"`
+- A refresh token (`vln_ort_...`), a `vln_oac_...` credential, an unrecognized secret, or an API key the API rejects: HTTP 401, with that same challenge and `error="invalid_token"`
 - Health check, no credentials: `GET https://mcp.vulnify.io/health`

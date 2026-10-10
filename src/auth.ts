@@ -8,9 +8,10 @@ export type ApiKeyRead =
 export type HttpCredential =
   | { ok: true; kind: 'api_key'; apiKey: string }
   | { ok: true; kind: 'oauth'; accessToken: string }
-  | { ok: false; message: string; challenge: 'missing' | 'invalid_request' };
+  | { ok: false; message: string; challenge: 'missing' | 'invalid_request' | 'invalid_token' };
 
 const OAUTH_ACCESS_TOKEN = /^vln_oat_\S+$/;
+const API_KEY = /^vln_(?:live|test)_\S+$/;
 
 function single(value: HeaderValue): { ok: true; value: string } | { ok: false; message: string; reason: 'malformed' } | undefined {
   if (value === undefined) return undefined;
@@ -68,8 +69,10 @@ export function readApiKey(headers: HeaderMap): ApiKeyRead {
 }
 
 /**
- * Classifies a per-request credential. `vln_oat_...` is an OAuth access token.
- * `vln_live_...` and `vln_test_...` keys stay on the API-key path, from either header.
+ * Classifies a per-request credential.
+ * `vln_oat_...` is an OAuth access token. `vln_live_...` and `vln_test_...` are API keys.
+ * A refresh token (`vln_ort_...`), a `vln_oac_...` credential, or any other format is rejected
+ * so the client receives 401 and can sign in again.
  */
 export function readHttpCredential(headers: HeaderMap): HttpCredential {
   const read = readApiKey(headers);
@@ -86,5 +89,13 @@ export function readHttpCredential(headers: HeaderMap): HttpCredential {
   if (OAUTH_ACCESS_TOKEN.test(read.apiKey)) {
     return { ok: true, kind: 'oauth', accessToken: read.apiKey };
   }
-  return { ok: true, kind: 'api_key', apiKey: read.apiKey };
+  if (API_KEY.test(read.apiKey)) {
+    return { ok: true, kind: 'api_key', apiKey: read.apiKey };
+  }
+  return {
+    ok: false,
+    challenge: 'invalid_token',
+    message:
+      'This credential cannot call the MCP server. Sign in with Vulnify, or send an access token (vln_oat_...) or an API key (vln_live_... or vln_test_...).',
+  };
 }

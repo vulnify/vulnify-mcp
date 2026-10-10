@@ -1,6 +1,7 @@
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type ErrorRequestHandler, type Express, type NextFunction, type Request, type Response } from 'express';
 import type { Server } from 'node:http';
+import { ApiKeyChecker } from './api-key.js';
 import { VulnifyClient } from './api.js';
 import { readHttpCredential } from './auth.js';
 import { DEFAULT_PORT, PROTECTED_RESOURCE_METADATA, VERSION } from './constants.js';
@@ -64,6 +65,11 @@ export function createHttpApp(options: HttpAppOptions): Express {
     fetch: options.fetch,
     now: options.now,
   });
+  const apiKeys = new ApiKeyChecker({
+    baseUrl: options.baseUrl,
+    fetch: options.fetch,
+    now: options.now,
+  });
   const app = express();
   app.disable('x-powered-by');
 
@@ -113,7 +119,8 @@ export function createHttpApp(options: HttpAppOptions): Express {
 
     const credential = readHttpCredential(req.headers);
     if (!credential.ok) {
-      unauthorized(res, credential.message, credential.challenge === 'missing' ? undefined : 'invalid_request');
+      const error = credential.challenge === 'missing' ? undefined : credential.challenge;
+      unauthorized(res, credential.message, error);
       return;
     }
 
@@ -150,6 +157,20 @@ export function createHttpApp(options: HttpAppOptions): Express {
         oauth: { accessToken: credential.accessToken, scopes: introspection.scopes },
       });
     } else {
+      const check = await apiKeys.check(credential.apiKey);
+      if (!check.ok) {
+        if (check.reason === 'invalid') {
+          unauthorized(res, 'Vulnify rejected the API key. It is invalid, revoked, or expired.', 'invalid_token');
+          return;
+        }
+        logger('api key validation unavailable');
+        res.setHeader('Cache-Control', 'no-store');
+        res.status(503).json({
+          error: 'unavailable',
+          message: 'Vulnify could not validate the API key. Try again shortly.',
+        });
+        return;
+      }
       client = new VulnifyClient({
         apiKey: credential.apiKey,
         baseUrl: options.baseUrl,

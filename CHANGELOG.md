@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Hosted HTTP accepts OAuth 2.1 user access tokens (`vln_oat_...`) and still accepts `vln_live_` / `vln_test_` API keys. A request with no credentials returns 401 with the protected-resource `WWW-Authenticate` challenge. `plan_policy_changes` and `check_mcp_tool_call` stay API-key only.
+- A `vln_ort_...` refresh token, a `vln_oac_...` credential, or any other unrecognized secret is rejected with 401 and `WWW-Authenticate` (`error="invalid_token"`) before `initialize` or `tools/list`. API keys are checked with `GET /v1/policies` on first use. A successful check is cached for at most 60 seconds under a hash of the key. A key the API rejects returns that same 401.
 - Tool descriptions state that `finalDecision` is the authoritative result. Every tool keeps its title, `readOnlyHint`, and `destructiveHint`. `openWorldHint` is true because each tool calls the Vulnify API.
 
 ## 0.1.2
