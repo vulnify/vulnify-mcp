@@ -1,44 +1,109 @@
 # Use Vulnify with Cursor, Claude, Grok or your code
 
-The Vulnify MCP server lets an agent ask whether an action may run. Sign in at `https://mcp.vulnify.io/mcp`, or run it locally with `npx -y @vulnify/mcp` and `VULNIFY_API_KEY`. The guide is at [https://docs.vulnify.io/mcp/](https://docs.vulnify.io/mcp/).
+The Vulnify MCP server lets an agent ask whether an action may run. The primary path is Sign in with Vulnify at `https://mcp.vulnify.io/mcp`. The guide is [https://docs.vulnify.io/mcp/](https://docs.vulnify.io/mcp/).
 
 `check_action` previews a decision. It skips the PII scan and records nothing. `decide_action` records a decision. A `REVIEW` is not approval. This server cannot approve or deny a review.
 
-Claude custom connector: add `https://mcp.vulnify.io/mcp` and sign in. See [Claude custom connector](#claude-custom-connector).
+## Sign in with Vulnify
 
-Cursor: [Install Vulnify](cursor://anysphere.cursor-deeplink/mcp/install?name=vulnify&config=eyJ1cmwiOiJodHRwczovL21jcC52dWxuaWZ5LmlvL21jcCJ9).
+Connect to `https://mcp.vulnify.io/mcp`. The server speaks Streamable HTTP and keeps no session. Leave API-key and OAuth client fields empty. The client receives HTTP 401 and:
 
-Create a dedicated TEST key (`vln_test_...`) for a manual API-key config. Set `VULNIFY_BASE_URL` only when the API is not `https://api.vulnify.io`. API-key snippets for Cursor, Claude Code, Claude Desktop, and VS Code are below. Hosted API-key snippets are in [Remote URL](#remote-url).
+```
+WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"
+```
 
-## Cursor
+The body is `{"error":"unauthorized","message":"Sign in with Vulnify, or send an API key as Authorization: Bearer or X-Vulnify-Key:."}`. Protected-resource metadata lists the authorization server `https://api.vulnify.io`.
 
-Project config is `.cursor/mcp.json`. User config is `~/.cursor/mcp.json`.
+You choose an organization and allow the scopes the client requests:
+
+| Scope | Tools |
+| --- | --- |
+| `decisions:read` | `get_decision` |
+| `decisions:write` | `decide_action` |
+| `policies:read` | `list_policies` |
+| `policies:test` | `check_action`, `test_policies` |
+
+After you allow access, the hosted server offers those five tools. `plan_policy_changes` and `check_mcp_tool_call` are not in that list. They need an API key, through a manual config or local `npx -y @vulnify/mcp`. A missing scope comes back as a tool error that names the scope. That error is not an `ALLOW`.
+
+Revoke the connection under Settings > Connected apps: [app.vulnify.io/settings/connected-apps](https://app.vulnify.io/settings/connected-apps).
+
+### Claude
+
+In Claude, open Settings > Connectors > Add custom connector. Set the URL to `https://mcp.vulnify.io/mcp`. Do not paste an API key.
+
+Add Vulnify in Claude opens that dialog with the name and URL filled in. Claude then starts Sign in with Vulnify.
+
+### Cursor
+
+[Install in Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=vulnify&config=eyJ1cmwiOiJodHRwczovL21jcC52dWxuaWZ5LmlvL21jcCJ9) adds the hosted server and starts sign-in.
+
+The same server in `.cursor/mcp.json`, or in `~/.cursor/mcp.json`, is the URL with no header:
 
 ```json
 {
   "mcpServers": {
     "vulnify": {
-      "command": "npx",
-      "args": ["-y", "@vulnify/mcp"],
-      "env": {
-        "VULNIFY_API_KEY": "${env:VULNIFY_API_KEY}"
-      }
+      "url": "https://mcp.vulnify.io/mcp"
     }
   }
 }
 ```
 
-## Claude Code
+The Cursor plugin in this repo (`.cursor-plugin/plugin.json`) points at that URL.
+
+### Grok
+
+Open [grok.com/connectors](https://grok.com/connectors), then New Connector > Custom. Name it `Vulnify`. Set the URL to `https://mcp.vulnify.io/mcp`. Leave the OAuth fields empty. Grok starts Sign in with Vulnify.
+
+### Claude Code
 
 ```bash
-claude mcp add --transport stdio vulnify --env VULNIFY_API_KEY=vln_test_your_key -- npx -y @vulnify/mcp
+claude mcp add --transport http vulnify https://mcp.vulnify.io/mcp
 ```
 
-Prefer an environment variable over a key written into the shell history when you can. This is Claude Code on your machine. It is not the Claude connectors directory.
+Claude Code then signs in. Do not pass an API key on this command.
 
-## Claude Desktop
+## API key or local npx
 
-Claude Desktop runs a local stdio server. Edit `claude_desktop_config.json` (on macOS, `~/Library/Application Support/Claude/claude_desktop_config.json`; on Windows, `%APPDATA%\Claude\claude_desktop_config.json`) and restart the app.
+Use an API key when you need `plan_policy_changes` or `check_mcp_tool_call`, when the client cannot open a browser, or when the key has an IP allowlist. The local process needs Node.js 20 or newer and reads `VULNIFY_API_KEY`. It does not open the OAuth consent page.
+
+```bash
+npx -y @vulnify/mcp
+```
+
+```bash
+VULNIFY_API_KEY=vln_live_... npx -y @vulnify/mcp
+```
+
+The key is `vln_live_...` or `vln_test_...`. A `TEST` key stores sandbox events. Those stay out of the main dashboards.
+
+On the hosted server, send the key on every request. Either header works:
+
+```
+Authorization: Bearer <key>
+X-Vulnify-Key: <key>
+```
+
+An API-key session lists all seven tools.
+
+### Cursor
+
+Hosted:
+
+```json
+{
+  "mcpServers": {
+    "vulnify": {
+      "url": "https://mcp.vulnify.io/mcp",
+      "headers": {
+        "Authorization": "Bearer vln_live_..."
+      }
+    }
+  }
+}
+```
+
+Local:
 
 ```json
 {
@@ -47,18 +112,60 @@ Claude Desktop runs a local stdio server. Edit `claude_desktop_config.json` (on 
       "command": "npx",
       "args": ["-y", "@vulnify/mcp"],
       "env": {
-        "VULNIFY_API_KEY": "vln_test_your_key"
+        "VULNIFY_API_KEY": "vln_live_..."
       }
     }
   }
 }
 ```
 
-A custom connector in Claude does not use this file and does not use an API key. Add `https://mcp.vulnify.io/mcp` and sign in. See [Claude custom connector](#claude-custom-connector).
+`X-Vulnify-Key` works in place of `Authorization` on the hosted server.
 
-## VS Code
+### Claude Code with an API key
 
-Workspace file `.vscode/mcp.json`, or the user MCP config.
+```bash
+claude mcp add --transport http vulnify https://mcp.vulnify.io/mcp --header "Authorization: Bearer vln_test_your_key"
+```
+
+Prefer an environment variable over a key written into the shell history. For sign-in, use the Claude Code command with no header.
+
+### Claude Desktop
+
+Claude Desktop can run the local process. On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config.json`. On Windows it is `%APPDATA%\Claude\claude_desktop_config.json`. Restart the app after saving.
+
+```json
+{
+  "mcpServers": {
+    "vulnify": {
+      "command": "npx",
+      "args": ["-y", "@vulnify/mcp"],
+      "env": {
+        "VULNIFY_API_KEY": "vln_live_..."
+      }
+    }
+  }
+}
+```
+
+### VS Code
+
+`.vscode/mcp.json`, hosted:
+
+```json
+{
+  "servers": {
+    "vulnify": {
+      "type": "http",
+      "url": "https://mcp.vulnify.io/mcp",
+      "headers": {
+        "Authorization": "Bearer ${input:vulnify-api-key}"
+      }
+    }
+  }
+}
+```
+
+Local:
 
 ```json
 {
@@ -68,24 +175,18 @@ Workspace file `.vscode/mcp.json`, or the user MCP config.
       "command": "npx",
       "args": ["-y", "@vulnify/mcp"],
       "env": {
-        "VULNIFY_API_KEY": "${env:VULNIFY_API_KEY}"
+        "VULNIFY_API_KEY": "${input:vulnify-api-key}"
       }
     }
   }
 }
 ```
 
-## Other local clients
+### Your own code
 
-Any MCP client that can launch a stdio process can run the same package:
+An MCP client that speaks Streamable HTTP can use `https://mcp.vulnify.io/mcp` with no key and complete Sign in with Vulnify, or send `Authorization: Bearer <key>` or `X-Vulnify-Key`.
 
-```bash
-VULNIFY_API_KEY=vln_test_your_key npx -y @vulnify/mcp
-```
-
-## Your code
-
-Application code that should decide before it exports or sends data uses the SDK, not this MCP server. The MCP server is for an agent that already speaks MCP. The SDK is for your process.
+Application code that decides inside your own process uses the SDK, not this server.
 
 ```bash
 npm install @vulnify/sdk
@@ -119,90 +220,12 @@ The `finalDecision` field is the authoritative result. `REVIEW` and `BLOCK` mean
 
 If the SDK cannot reach Vulnify, the default is a fail-closed decision, not a thrown tool error. The MCP server returns an error instead, so an agent does not read a fallback as `ALLOW`.
 
-## Security
+See the [Node.js SDK](https://github.com/vulnify/vulnify-sdk). The docs page also links the Python SDK.
 
-API-key IP allowlists are checked against the hosted server's egress IP when using `https://mcp.vulnify.io/mcp`, not the end user's IP. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`) instead.
+## IP allowlists
+
+An API key can list allowed source IPs. Calls through the hosted server with that key come from the server's egress address, not from the machine where Cursor or VS Code is running. An allowlist that only contains an office or laptop address rejects the hosted server.
+
+Use `npx -y @vulnify/mcp` over stdio for an allowlisted key, on a host whose address is on the list. The key stays in that process's environment. Sign in with Vulnify does not send that API key.
 
 Do not put the API key in a tool argument, a URL, or a committed config file. The local process reads `VULNIFY_API_KEY` from the environment. The hosted server reads `Authorization: Bearer <key>` or `X-Vulnify-Key` on each request and does not log the key.
-
-## Claude custom connector
-
-In Claude, add a custom connector and paste this URL only:
-
-`https://mcp.vulnify.io/mcp`
-
-Do not enter an API key. Claude calls that URL, reads the 401 `WWW-Authenticate` challenge, and opens Vulnify sign-in. Approve access on the consent page. Claude then calls the server with your user access token (`vln_oat_...`).
-
-| Tool | Scope |
-| --- | --- |
-| `check_action` | `policies:test` |
-| `test_policies` | `policies:test` |
-| `decide_action` | `decisions:write` |
-| `get_decision` | `decisions:read` |
-| `list_policies` | `policies:read` |
-
-An OAuth `tools/list` returns those five tools. `plan_policy_changes` and `check_mcp_tool_call` stay on API-key and stdio sessions. This server has no approve tool and no deny tool.
-
-## Remote URL
-
-These snippets connect to the hosted server at `https://mcp.vulnify.io/mcp` with an API key. For Claude, use the [custom connector](#claude-custom-connector) and omit the key.
-
-API-key IP allowlists are checked against the hosted server's egress IP when using `https://mcp.vulnify.io/mcp`, not the end user's IP. Users who need an IP allowlist should run the local npx/stdio mode (`npx -y @vulnify/mcp`) instead.
-
-The server does not keep a session. Send the key on every API-key request. A request with no credentials gets 401 and:
-
-```
-WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"
-```
-
-`GET /health` does not require a key. `GET /.well-known/oauth-protected-resource` and `GET /.well-known/oauth-protected-resource/mcp` return this server's protected-resource JSON, with `scopes_supported` set to those four scopes.
-
-### Cursor
-
-```json
-{
-  "mcpServers": {
-    "vulnify": {
-      "url": "https://mcp.vulnify.io/mcp",
-      "headers": {
-        "Authorization": "Bearer ${env:VULNIFY_API_KEY}"
-      }
-    }
-  }
-}
-```
-
-The Cursor plugin in this repo (`.cursor-plugin/plugin.json`) points at `https://mcp.vulnify.io/mcp` and signs in with Vulnify. The JSON above is a manual API-key config. The deeplink is [Install Vulnify](cursor://anysphere.cursor-deeplink/mcp/install?name=vulnify&config=eyJ1cmwiOiJodHRwczovL21jcC52dWxuaWZ5LmlvL21jcCJ9).
-
-### Claude Code
-
-```bash
-claude mcp add --transport http vulnify https://mcp.vulnify.io/mcp --header "Authorization: Bearer vln_test_your_key"
-```
-
-Prefer an environment variable over a key written into the shell history when you can. Claude Code stores the header in its local MCP config. This is Claude Code on your machine. It is not the Claude connectors directory.
-
-### VS Code
-
-```json
-{
-  "servers": {
-    "vulnify": {
-      "type": "http",
-      "url": "https://mcp.vulnify.io/mcp",
-      "headers": {
-        "Authorization": "Bearer ${env:VULNIFY_API_KEY}"
-      }
-    }
-  }
-}
-```
-
-### Other Streamable HTTP clients
-
-- URL: `https://mcp.vulnify.io/mcp`
-- OAuth: no header. The client signs in and sends `Authorization: Bearer vln_oat_...`
-- API key header: `Authorization: Bearer <api-key>` or `X-Vulnify-Key: <api-key>`
-- Missing credentials: HTTP 401, with `WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"`
-- A refresh token (`vln_ort_...`), a `vln_oac_...` credential, an unrecognized secret, or an API key the API rejects: HTTP 401, with that same challenge and `error="invalid_token"`
-- Health check, no credentials: `GET https://mcp.vulnify.io/health`

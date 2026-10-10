@@ -3,7 +3,7 @@
   "name": "io.vulnify/mcp",
   "title": "Vulnify",
   "description": "Ask Vulnify before an AI agent acts. Check, record, and read policy decisions.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "websiteUrl": "https://docs.vulnify.io",
   "repository": {
     "url": "https://github.com/vulnify/vulnify-mcp",
@@ -17,11 +17,34 @@
       "theme": "dark"
     }
   ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.vulnify.io/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Sign in with Vulnify (OAuth 2.1). Leave this header empty. Set it only to send an API key (vln_live_... or vln_test_...) as a Bearer token. X-Vulnify-Key also works.",
+          "isRequired": false,
+          "isSecret": true,
+          "value": "Bearer {api_key}",
+          "variables": {
+            "api_key": {
+              "description": "Optional Vulnify API key (vln_live_... or vln_test_...). Leave empty to sign in with Vulnify.",
+              "isRequired": false,
+              "isSecret": true,
+              "format": "string"
+            }
+          }
+        }
+      ]
+    }
+  ],
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@vulnify/mcp",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"
@@ -29,7 +52,7 @@
       "environmentVariables": [
         {
           "name": "VULNIFY_API_KEY",
-          "description": "Vulnify API key (vln_live_... or vln_test_...).",
+          "description": "Vulnify API key (vln_live_... or vln_test_...) for the local stdio process. The hosted server signs in with Vulnify and does not need this variable.",
           "isRequired": true,
           "isSecret": true,
           "format": "string"
@@ -40,29 +63,6 @@
           "isRequired": false,
           "isSecret": false,
           "format": "string"
-        }
-      ]
-    }
-  ],
-  "remotes": [
-    {
-      "type": "streamable-http",
-      "url": "https://mcp.vulnify.io/mcp",
-      "headers": [
-        {
-          "name": "Authorization",
-          "description": "Optional Vulnify API key (vln_live_... or vln_test_...) as a Bearer token. Omit this header to sign in with OAuth.",
-          "isRequired": false,
-          "isSecret": true,
-          "value": "Bearer {api_key}",
-          "variables": {
-            "api_key": {
-              "description": "Vulnify API key (vln_live_... or vln_test_...). Leave empty to use OAuth.",
-              "isRequired": false,
-              "isSecret": true,
-              "format": "string"
-            }
-          }
         }
       ]
     }

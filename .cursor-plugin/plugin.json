@@ -1,6 +1,6 @@
 {
   "name": "vulnify",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Runtime authorization for AI agents. Sign in with Vulnify before an action runs.",
   "author": {
     "name": "Vulnify",
