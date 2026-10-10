@@ -32,8 +32,8 @@ const PROTECTED_RESOURCE = {
   bearer_methods_supported: ['header'],
 };
 
-function jsonResponse(body: unknown): Response {
-  return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
 describe('readApiKey', () => {
@@ -63,15 +63,30 @@ describe('readHttpCredential', () => {
     assert.equal(missing.ok, false);
     if (!missing.ok) assert.equal(missing.challenge, 'missing');
   });
+
+  it('rejects refresh tokens, vln_oac_ credentials, and unknown formats', () => {
+    for (const secret of ['vln_ort_refresh_token', 'vln_oac_auth_code', 'not-a-vulnify-secret', 'vln_oc_client_id', 'vln_live_']) {
+      const bearer = readHttpCredential({ authorization: `Bearer ${secret}` });
+      const header = readHttpCredential({ 'x-vulnify-key': secret });
+      assert.equal(bearer.ok, false);
+      assert.equal(header.ok, false);
+      if (!bearer.ok) assert.equal(bearer.challenge, 'invalid_token');
+      if (!header.ok) assert.equal(header.challenge, 'invalid_token');
+    }
+  });
 });
 
 describe('redact', () => {
   it('removes live and test key material', () => {
     const token = 'vln_oat_http_access_token';
-    const text = redact(`denied for ${KEY} and ${OTHER} and ${token}`);
+    const refresh = 'vln_ort_http_refresh_token';
+    const code = 'vln_oac_http_auth_code';
+    const text = redact(`denied for ${KEY} and ${OTHER} and ${token} and ${refresh} and ${code}`);
     assert.equal(text.includes(KEY), false);
     assert.equal(text.includes(OTHER), false);
     assert.equal(text.includes(token), false);
+    assert.equal(text.includes(refresh), false);
+    assert.equal(text.includes(code), false);
     assert.match(text, /vln_\[redacted\]/);
   });
 });
@@ -155,7 +170,9 @@ describe('HTTP server', () => {
   });
 
   it('publishes the registered tools, header auth, and links on the server card', async () => {
-    const base = await listen();
+    const base = await listen({
+      fetchImpl: async () => jsonResponse({ apiVersion: 'vulnify.io/v1', policies: [] }),
+    });
     const card = await fetch(`${base}/.well-known/mcp/server-card.json`);
     assert.equal(card.status, 200);
     const cardBody = (await card.json()) as ServerCard;
@@ -481,6 +498,27 @@ describe('HTTP server', () => {
   });
 
   it('returns 503 when the introspection secret is not configured', async () => {
+    const urls: string[] = [];
+    const base = await listen({
+      fetchImpl: async (input) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        urls.push(url);
+        return jsonResponse({ apiVersion: 'vulnify.io/v1', policies: [] });
+      },
+    });
+    const oauth = await postInitialize(base, TOKEN);
+    assert.equal(oauth.status, 503);
+    const body = await oauth.text();
+    assert.equal(body.includes(TOKEN), false);
+    assert.equal(urls.some((url) => url.includes('/oauth/introspect')), false);
+    const key = await postInitialize(base, KEY);
+    assert.equal(key.status, 200);
+    assert.deepEqual(urls, ['https://api.vulnify.test/v1/policies']);
+    assert.equal(logs.join('\n').includes(TOKEN), false);
+    assert.equal(logs.join('\n').includes(KEY), false);
+  });
+
+  it('rejects refresh tokens, vln_oac_ credentials, and unknown formats before calling the API', async () => {
     let called = false;
     const base = await listen({
       fetchImpl: async () => {
@@ -488,14 +526,90 @@ describe('HTTP server', () => {
         return jsonResponse({});
       },
     });
-    const oauth = await postInitialize(base, TOKEN);
-    assert.equal(oauth.status, 503);
-    const body = await oauth.text();
-    assert.equal(body.includes(TOKEN), false);
-    const key = await postInitialize(base, KEY);
-    assert.equal(key.status, 200);
+    for (const secret of ['vln_ort_refresh_token', 'vln_oac_auth_code', 'not-a-vulnify-secret', 'vln_nope_unknown']) {
+      for (const method of ['initialize', 'tools/list']) {
+        const response = await postInitialize(base, secret, method);
+        assert.equal(response.status, 401);
+        assert.equal(response.headers.get('www-authenticate'), `${CHALLENGE}, error="invalid_token"`);
+        const body = await response.text();
+        assert.equal(body.includes(secret), false);
+        assert.match(body, /access token/);
+      }
+      const header = await fetch(`${base}/mcp`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          'x-vulnify-key': secret,
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+      });
+      assert.equal(header.status, 401);
+      assert.equal(header.headers.get('www-authenticate'), `${CHALLENGE}, error="invalid_token"`);
+      assert.equal((await header.text()).includes(secret), false);
+    }
     assert.equal(called, false);
-    assert.equal(logs.join('\n').includes(TOKEN), false);
+    assert.equal(logs.join('\n').includes('vln_ort_refresh_token'), false);
+    assert.equal(logs.join('\n').includes('vln_oac_auth_code'), false);
+  });
+
+  it('checks an API key before initialize and tools/list, and caches a success for at most 60s', async () => {
+    let now = 1_700_000_000_000;
+    let checks = 0;
+    const base = await listen({
+      now: () => now,
+      fetchImpl: async (input, init) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        assert.equal(url, 'https://api.vulnify.test/v1/policies');
+        assert.equal(init?.method, 'GET');
+        const authorization = new Headers(init?.headers).get('authorization') ?? '';
+        checks += 1;
+        if (authorization === `Bearer ${OTHER}`) return jsonResponse({ message: 'Invalid API key' }, 401);
+        assert.equal(authorization, `Bearer ${KEY}`);
+        return jsonResponse({ apiVersion: 'vulnify.io/v1', policies: [] });
+      },
+    });
+
+    const initialize = await postInitialize(base, KEY);
+    assert.equal(initialize.status, 200);
+    const listed = await postInitialize(base, KEY, 'tools/list');
+    assert.equal(listed.status, 200);
+    assert.equal(checks, 1);
+
+    now += 60_000;
+    assert.equal((await postInitialize(base, KEY)).status, 200);
+    assert.equal(checks, 2);
+
+    const rejected = await postInitialize(base, OTHER, 'tools/list');
+    assert.equal(rejected.status, 401);
+    assert.equal(rejected.headers.get('www-authenticate'), `${CHALLENGE}, error="invalid_token"`);
+    const rejectedBody = await rejected.text();
+    assert.match(rejectedBody, /API key/);
+    assert.equal(rejectedBody.includes(OTHER), false);
+    assert.equal((await postInitialize(base, OTHER)).status, 401);
+    assert.equal(checks, 4);
+
+    const logText = logs.join('\n');
+    assert.equal(logText.includes(KEY), false);
+    assert.equal(logText.includes(OTHER), false);
+  });
+
+  it('returns 503 when the API key check cannot reach Vulnify', async () => {
+    let calls = 0;
+    const base = await listen({
+      fetchImpl: async () => {
+        calls += 1;
+        return jsonResponse({ message: 'unavailable' }, 503);
+      },
+    });
+    const response = await postInitialize(base, KEY, 'tools/list');
+    assert.equal(response.status, 503);
+    assert.equal(response.headers.get('www-authenticate'), null);
+    const body = await response.text();
+    assert.match(body, /could not validate the API key/);
+    assert.equal(body.includes(KEY), false);
+    assert.equal((await postInitialize(base, KEY)).status, 503);
+    assert.equal(calls, 2);
   });
 });
 
@@ -514,7 +628,11 @@ function textOf(result: unknown): string {
   return JSON.stringify(result);
 }
 
-function postInitialize(base: string, token: string): Promise<Response> {
+function postInitialize(base: string, token: string, method = 'initialize'): Promise<Response> {
+  const params =
+    method === 'initialize'
+      ? { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } }
+      : {};
   return fetch(`${base}/mcp`, {
     method: 'POST',
     headers: {
@@ -522,11 +640,6 @@ function postInitialize(base: string, token: string): Promise<Response> {
       accept: 'application/json, text/event-stream',
       authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 't', version: '0' } },
-    }),
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
   });
 }

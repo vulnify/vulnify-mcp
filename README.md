@@ -98,6 +98,8 @@ WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="
 
 A `vln_oat_...` access token is checked with `POST /oauth/introspect`, then sent to `/v1/mcp/*`. `check_action` and `test_policies` need `policies:test`. `decide_action` needs `decisions:write`. `get_decision` needs `decisions:read`. `list_policies` needs `policies:read`. `plan_policy_changes` and `check_mcp_tool_call` stay API-key only: the API has no `/v1/mcp` route for policy apply or the MCP gateway. There is no approve tool and no deny tool.
 
+A `vln_ort_...` refresh token, a `vln_oac_...` credential, or any other unrecognized secret receives **401** and `WWW-Authenticate` with `error="invalid_token"`. A `vln_live_...` or `vln_test_...` key is checked with `GET /v1/policies` before `initialize` and `tools/list`. A key the API rejects receives that same 401. A successful check is reused for at most 60 seconds. The cache key is a hash of the API key.
+
 ## How it works
 
 <p align="center">
@@ -234,7 +236,7 @@ This package does not run a shell and does not register hooks. Do not put a key 
 
 Network endpoints this process uses:
 
-- `https://api.vulnify.io` (or `VULNIFY_BASE_URL`) for every tool call. An API key is sent as `Authorization: Bearer` to `/v1/*`. A user access token is sent as `Authorization: Bearer` to `/v1/mcp/*`.
+- `https://api.vulnify.io` (or `VULNIFY_BASE_URL`) for every tool call, and for `GET /v1/policies` when an API key is checked. An API key is sent as `Authorization: Bearer` to `/v1/*`. A user access token is sent as `Authorization: Bearer` to `/v1/mcp/*`.
 - `POST /oauth/introspect` on that same origin, with `Authorization: Bearer` set to `OAUTH_INTROSPECTION_SECRET`, to validate `vln_oat_...` tokens. The secret is not sent to clients and is not logged.
 - `https://mcp.vulnify.io/mcp` is the hosted HTTP transport. The server process does not call that URL.
 

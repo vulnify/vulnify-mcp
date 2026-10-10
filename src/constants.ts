@@ -10,6 +10,8 @@ export const MIN_POLL_MS = 200;
 export const REQUEST_TIMEOUT_MS = 20_000;
 /** Active introspection results are reused for at most this long, and never past exp. */
 export const INTROSPECTION_CACHE_MS = 60_000;
+/** A successful API-key check is reused for at most this long. */
+export const API_KEY_CACHE_MS = 60_000;
 
 /** Canonical MCP resource (RFC 8707). Discovery URLs use this host, not the request Host header. */
 export const MCP_RESOURCE = 'https://mcp.vulnify.io/mcp';
