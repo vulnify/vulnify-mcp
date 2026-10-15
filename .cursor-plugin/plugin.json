@@ -6,11 +6,15 @@
     "name": "Vulnify",
     "email": "contact@vulnify.io"
   },
-  "homepage": "https://docs.vulnify.io/mcp/",
+  "homepage": "https://docs.vulnify.io/mcp/?utm_source=cursor-origin&utm_medium=marketplace&utm_campaign=mcp-listing",
   "repository": "https://github.com/vulnify/vulnify-mcp",
   "license": "MIT",
-  "keywords": ["vulnify", "vulnify-mcp", "runtime-authorization"],
-  "logo": "assets/logo.svg",
+  "keywords": [
+    "vulnify",
+    "vulnify-mcp",
+    "runtime-authorization"
+  ],
+  "logo": "assets/logo-plate.png",
   "skills": "./skills/",
   "rules": "./rules/",
   "mcpServers": "./mcp.json"
