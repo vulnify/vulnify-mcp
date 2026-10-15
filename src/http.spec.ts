@@ -672,7 +672,7 @@ describe('cursor plugin', () => {
     assert.equal(plugin.version, '0.1.4');
     assert.match(plugin.description, /Sign in with Vulnify/);
     assert.equal(plugin.author.email, 'contact@vulnify.io');
-    assert.equal(plugin.homepage, 'https://docs.vulnify.io/mcp/');
+    assert.equal(plugin.homepage, 'https://docs.vulnify.io/mcp/?utm_source=cursor-origin&utm_medium=marketplace&utm_campaign=mcp-listing');
     assert.equal(plugin.variables, undefined);
     assert.deepEqual(mcp, { mcpServers: { vulnify: { url: 'https://mcp.vulnify.io/mcp' } } });
   });
