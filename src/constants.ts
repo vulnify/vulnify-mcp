@@ -50,19 +50,24 @@ export const PROTECTED_RESOURCE_METADATA = {
 
 export const INSTRUCTIONS = [
   'Vulnify is a runtime authorization layer. The finalDecision field is the authoritative result: ALLOW, REVIEW, or BLOCK.',
-  'check_action previews a decision. It skips the PII scan and records nothing.',
-  'decide_action and check_mcp_tool_call record a decision. check_action is the preview and records nothing.',
-  'REVIEW means a human decides. This server cannot approve or deny a review.',
-  'When finalDecision is REVIEW, get_decision can poll until it is ALLOW or BLOCK.',
-  'A tool error does not include finalDecision. finalDecision is present on a successful decision.',
+  'When to call: before you take a consequential action with any tool or connector in this session, call decide_action first. Consequential means sending an email or message, exporting or sharing data outside the organization, deleting data, writing to production, customer, or financial records, making a payment, or writing to an external API. Reads and drafts that stay with the user do not need a call.',
+  'Describe the action you are about to take: agent (your agent name, for example claude), action, resource, destination, and records when known.',
+  'How to act on finalDecision: ALLOW means proceed. REVIEW means a person decides: hold the action, tell the user it is waiting for approval in Vulnify, and use get_decision with the event id to check again. BLOCK means skip the action and tell the user the reasons.',
+  'A tool error is not an ALLOW. Hold the action and tell the user.',
+  'Use check_action only for what-if questions when you are not about to act. It skips the PII scan and records nothing.',
+  'This is guidance for the model. Vulnify does not intercept other tools by itself; hooks or the Vulnify gateway enforce it.',
+  'check_mcp_tool_call also records a decision, judged by a downstream MCP tool name.',
+  'REVIEW cannot be approved or denied through this server.',
 ].join(' ');
 
 /** Instructions for an OAuth session, which does not list the API-key-only tools. */
 export const OAUTH_INSTRUCTIONS = [
   'Vulnify is a runtime authorization layer. The finalDecision field is the authoritative result: ALLOW, REVIEW, or BLOCK.',
-  'check_action previews a decision. It skips the PII scan and records nothing.',
-  'decide_action records a decision. check_action is the preview and records nothing.',
-  'REVIEW means a human decides. This server cannot approve or deny a review.',
-  'When finalDecision is REVIEW, get_decision can poll until it is ALLOW or BLOCK.',
-  'A tool error does not include finalDecision. finalDecision is present on a successful decision.',
+  'When to call: before you take a consequential action with any tool or connector in this session, call decide_action first. Consequential means sending an email or message, exporting or sharing data outside the organization, deleting data, writing to production, customer, or financial records, making a payment, or writing to an external API. Reads and drafts that stay with the user do not need a call.',
+  'Describe the action you are about to take: agent (your agent name, for example claude), action, resource, destination, and records when known.',
+  'How to act on finalDecision: ALLOW means proceed. REVIEW means a person decides: hold the action, tell the user it is waiting for approval in Vulnify, and use get_decision with the event id to check again. BLOCK means skip the action and tell the user the reasons.',
+  'A tool error is not an ALLOW. Hold the action and tell the user.',
+  'Use check_action only for what-if questions when you are not about to act. It skips the PII scan and records nothing.',
+  'This is guidance for the model. Vulnify does not intercept other tools by itself; hooks or the Vulnify gateway enforce it.',
+  'REVIEW cannot be approved or denied through this server.',
 ].join(' ');

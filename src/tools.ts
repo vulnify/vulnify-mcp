@@ -96,7 +96,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     {
       title: 'Check action',
       description:
-        'Dry-run a proposed action against the organization policies (POST /v1/policies/test, one case, stored policies). This skips the PII scan and records nothing: no security event and no audit entry. There is no content field and no DLP scan. The result has no event id and no finalDecision. decide_action is the call that records a decision. Dry runs are limited to 60 requests per minute per key. test_policies covers up to 200 cases in one call.',
+        'Use for what-if questions when you are not about to act. Dry-run a proposed action against the organization policies (POST /v1/policies/test, one case, stored policies). This skips the PII scan and records nothing: no security event and no audit entry. There is no content field and no DLP scan. The result has no event id and no finalDecision. decide_action is the call that records a decision. Dry runs are limited to 60 requests per minute per key. test_policies covers up to 200 cases in one call.',
       inputSchema: checkActionInput,
       outputSchema: policyTestOutput,
       annotations: annotations('Check action', true, true),
@@ -118,7 +118,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     {
       title: 'Decide action',
       description:
-        'Records a decision for a proposed action (POST /v1/events). This writes a security event and an audit entry, counts toward the organization quota, and may open a human review. The finalDecision field is the authoritative result. decision is what was stored and does not change when a review is resolved. finalDecision stays REVIEW until a human approves, denies, or the review expires. This tool does not approve the review. A REVIEW or BLOCK finalDecision means the action was not allowed. Optional content is scanned in memory and is not stored. An idempotencyKey makes a retry return the same event.',
+        'Call this before a consequential action with any tool or connector: sending an email or message, exporting or sharing data, deleting data, writing to production or financial records, payments, or external API writes. ALLOW: proceed. REVIEW: hold the action, tell the user it waits for approval in Vulnify, and check again with get_decision. BLOCK: skip the action and explain the reasons. Records a decision for a proposed action (POST /v1/events). This writes a security event and an audit entry, counts toward the organization quota, and may open a human review. The finalDecision field is the authoritative result. decision is what was stored and does not change when a review is resolved. finalDecision stays REVIEW until a human approves, denies, or the review expires. This tool does not approve the review. A REVIEW or BLOCK finalDecision means the action was not allowed. Optional content is scanned in memory and is not stored. An idempotencyKey makes a retry return the same event.',
       inputSchema: decideActionInput,
       outputSchema: decisionOutput,
       annotations: annotations('Decide action', false, false),
