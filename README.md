@@ -17,6 +17,8 @@
 </p>
 
 <p align="center">
+  <a href="https://claude.ai/directory/vulnify"><strong>Connect to Claude</strong></a>
+  &nbsp;·&nbsp;
   <a href="https://docs.vulnify.io/mcp/">Docs</a>
   &nbsp;·&nbsp;
   <a href="https://github.com/vulnify/vulnify-mcp">MCP</a>
@@ -65,7 +67,9 @@ After you allow access, the hosted server offers those five tools. `plan_policy_
 
 #### Claude
 
-In Claude, open Settings > Connectors > Add custom connector. Set the URL to `https://mcp.vulnify.io/mcp`. Do not paste an API key. Add Vulnify in Claude opens that dialog with the name and URL filled in. Claude then starts Sign in with Vulnify.
+Vulnify is available in Claude's connector directory: **[Connect to Claude](https://claude.ai/directory/vulnify)**. Select Connect on the listing, then sign in with Vulnify. Walkthrough: [human approval for Claude actions](https://docs.vulnify.io/guides/claude-connector-approval/?utm_source=github&utm_medium=community&utm_campaign=vulnify-mcp).
+
+To add it by URL instead, open Settings > Connectors > Add custom connector. Set the URL to `https://mcp.vulnify.io/mcp`. Do not paste an API key. Add Vulnify in Claude opens that dialog with the name and URL filled in. Claude then starts Sign in with Vulnify.
 
 #### Cursor
 
