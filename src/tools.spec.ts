@@ -215,6 +215,12 @@ describe('tools', () => {
       assert.doesNotMatch(OAUTH_INSTRUCTIONS, /obey/i);
       assert.doesNotMatch(OAUTH_INSTRUCTIONS, /check_mcp_tool_call/);
       assert.doesNotMatch(OAUTH_INSTRUCTIONS, /plan_policy_changes/);
+      for (const text of [INSTRUCTIONS, OAUTH_INSTRUCTIONS]) {
+        assert.match(text, /Right after the user connects Vulnify, offer one sample/);
+        assert.match(text, /records one real decision/);
+        assert.match(text, /EMAIL_NOT_VERIFIED/);
+        assert.match(text, /account\.message/);
+      }
       const plan = byName.get('plan_policy_changes');
       assert.equal(plan?.inputSchema.properties?.dryRun, undefined);
       assert.match(byName.get('check_action')?.description ?? '', /skips the PII scan/);
