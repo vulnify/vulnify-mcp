@@ -132,7 +132,7 @@ describe('HTTP server', () => {
     assert.equal(health.status, 200);
     const body = (await health.json()) as { ok: boolean; version: string };
     assert.equal(body.ok, true);
-    assert.equal(body.version, '0.1.4');
+    assert.equal(body.version, '0.1.5');
     const card = await fetch(`${base}/.well-known/mcp/server-card.json`);
     assert.equal(card.status, 200);
     const cardBody = (await card.json()) as {

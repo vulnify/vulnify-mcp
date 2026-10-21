@@ -1,4 +1,4 @@
-export const VERSION = '0.1.4';
+export const VERSION = '0.1.5';
 export const SERVER_NAME = 'io.vulnify/mcp';
 export const SERVER_TITLE = 'Vulnify';
 export const WEBSITE_URL = 'https://www.vulnify.io';

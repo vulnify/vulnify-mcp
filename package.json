@@ -54,7 +54,7 @@
   },
   "scripts": {
     "build": "tsup",
-    "test": "tsx --test src/**/*.spec.ts",
+    "test": "tsx --test src/*.spec.ts",
     "test:live": "tsx scripts/live-smoke.ts",
     "lint": "tsc --noEmit -p tsconfig.json",
     "check:package": "publint && node scripts/verify-package.mjs"
