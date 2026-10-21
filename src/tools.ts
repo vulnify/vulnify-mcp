@@ -96,7 +96,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
     {
       title: 'Check action',
       description:
-        'Use for what-if questions when you are not about to act. Dry-run a proposed action against the organization policies (POST /v1/policies/test, one case, stored policies). This skips the PII scan and records nothing: no security event and no audit entry. There is no content field and no DLP scan. The result has no event id and no finalDecision. decide_action is the call that records a decision. Dry runs are limited to 60 requests per minute per key. test_policies covers up to 200 cases in one call. account.message, when present, is a note for the user. 403 EMAIL_NOT_VERIFIED: the user must confirm their email; not a decision.',
+        'Use for what-if questions when you are not about to act. Dry-run a proposed action against the organization policies (POST /v1/policies/test, one case, stored policies). This skips the PII scan and records nothing: no security event and no audit entry. There is no content field and no DLP scan. The result has no event id and no finalDecision. decide_action is the call that records a decision. Dry runs are limited to 60 requests per minute per key. test_policies covers up to 200 cases in one call. Before the user confirms their email, each check_action counts toward the daily decision limit. account.message, when present, is a note for the user. 403 EMAIL_NOT_VERIFIED: the user must confirm their email; not a decision.',
       inputSchema: checkActionInput,
       outputSchema: policyTestOutput,
       annotations: annotations('Check action', true, true),

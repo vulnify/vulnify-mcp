@@ -112,6 +112,10 @@ export function formatApiError(status: number, body: unknown, path: string): str
     case 413:
       return 'Vulnify rejected the body (413). JSON requests are limited to 200 KB. Shorten content or send fewer cases.';
     case 429:
+      // Unverified accounts created from Claude: 30 requests per minute per organization; the API explains it.
+      if ((body as { code?: unknown } | null)?.code === 'RATE_LIMITED' && apiMessage) {
+        return `Vulnify rate limit exceeded (429). ${apiMessage}`;
+      }
       return rateLimitMessage(path);
     case 400:
       return `Vulnify rejected the request (400). ${fields || apiMessage || 'Check the agent, resource, and action.'}`;

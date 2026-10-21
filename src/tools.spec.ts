@@ -556,6 +556,32 @@ describe('tools', () => {
     }
   });
 
+  it('passes the API message on for 429 RATE_LIMITED, with Retry-After', async () => {
+    const { fetch: fetchImpl } = installFetch(() => {
+      const res = jsonResponse(429, {
+        statusCode: 429,
+        code: 'RATE_LIMITED',
+        limit: 'requests_per_minute',
+        retryAfterSeconds: 12,
+        message: 'Before email confirmation, Vulnify accepts 30 requests per minute from this organization. Wait 12 seconds before retrying.',
+      });
+      res.headers.set('Retry-After', '12');
+      return res;
+    });
+    const { mcp, close } = await withClient(fetchImpl);
+    try {
+      const result = await mcp.callTool({ name: 'decide_action', arguments: { agent: 'claude', action: 'READ_DATA', resource: 'Docs' } });
+      assert.equal(result.isError, true);
+      const text = textOf(result);
+      assert.match(text, /\(429\)/);
+      assert.match(text, /30 requests per minute from this organization/);
+      assert.match(text, /Retry-After: 12/);
+      assert.doesNotMatch(text, /per API key/);
+    } finally {
+      await close();
+    }
+  });
+
   it('maps 401, 403, 413, and 429 to tool errors without echoing the key', async () => {
     const cases: Array<{ status: number; body: unknown; pattern: RegExp }> = [
       { status: 401, body: { message: `bad ${API_KEY}` }, pattern: /\(401\)/ },
