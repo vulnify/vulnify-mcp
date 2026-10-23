@@ -9,11 +9,12 @@ import {
 const CACHE_LIMIT = 1024;
 
 export type IntrospectionResult =
-  | { ok: true; scopes: string[] }
+  | { ok: true; scopes: string[]; org?: string }
   | { ok: false; reason: 'inactive' | 'unavailable' | 'unconfigured' };
 
 interface CacheEntry {
   scopes: string[];
+  org?: string;
   validUntil: number;
 }
 
@@ -51,7 +52,7 @@ export class TokenIntrospector {
   async introspect(token: string): Promise<IntrospectionResult> {
     const now = this.now();
     const cached = this.read(token, now);
-    if (cached) return { ok: true, scopes: [...cached.scopes] };
+    if (cached) return { ok: true, scopes: [...cached.scopes], ...(cached.org ? { org: cached.org } : {}) };
     if (!this.secret) return { ok: false, reason: 'unconfigured' };
 
     const timeout = new AbortController();
@@ -73,8 +74,8 @@ export class TokenIntrospector {
       const body = (await response.json()) as unknown;
       const active = parseActive(body, now);
       if (!active) return { ok: false, reason: 'inactive' };
-      this.store(token, active.scopes, active.exp, now);
-      return { ok: true, scopes: [...active.scopes] };
+      this.store(token, active.scopes, active.exp, now, active.org);
+      return { ok: true, scopes: [...active.scopes], ...(active.org ? { org: active.org } : {}) };
     } catch {
       return { ok: false, reason: 'unavailable' };
     } finally {
@@ -92,12 +93,12 @@ export class TokenIntrospector {
     return hit;
   }
 
-  private store(token: string, scopes: string[], exp: number | undefined, now: number): void {
+  private store(token: string, scopes: string[], exp: number | undefined, now: number, org?: string): void {
     const expMs = exp === undefined ? Number.POSITIVE_INFINITY : exp * 1000;
     const validUntil = Math.min(now + INTROSPECTION_CACHE_MS, expMs);
     if (!(validUntil > now)) return;
     this.cache.delete(token);
-    this.cache.set(token, { scopes: [...scopes], validUntil });
+    this.cache.set(token, { scopes: [...scopes], validUntil, org });
     while (this.cache.size > CACHE_LIMIT) {
       const oldest = this.cache.keys().next().value;
       if (oldest === undefined) break;
@@ -123,12 +124,15 @@ function audienceAllows(aud: unknown): boolean {
   return false;
 }
 
-function parseActive(body: unknown, now: number): { scopes: string[]; exp: number | undefined } | undefined {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parseActive(body: unknown, now: number): { scopes: string[]; exp: number | undefined; org: string | undefined } | undefined {
   if (!body || typeof body !== 'object') return undefined;
-  const record = body as { active?: unknown; scope?: unknown; exp?: unknown; aud?: unknown };
+  const record = body as { active?: unknown; scope?: unknown; exp?: unknown; aud?: unknown; org?: unknown };
   if (record.active !== true) return undefined;
   if (!audienceAllows(record.aud)) return undefined;
   const exp = typeof record.exp === 'number' && Number.isFinite(record.exp) ? record.exp : undefined;
   if (exp !== undefined && now >= exp * 1000) return undefined;
-  return { scopes: parseScopes(record.scope), exp };
+  const org = typeof record.org === 'string' && UUID_RE.test(record.org) ? record.org.toLowerCase() : undefined;
+  return { scopes: parseScopes(record.scope), exp, org };
 }

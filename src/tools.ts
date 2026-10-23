@@ -23,8 +23,12 @@ import {
 } from './schemas.js';
 import type { VulnifyClient } from './api.js';
 
+export type ToolCallStatus = 'ok' | 'error';
+
 export interface ToolRuntime {
   client: VulnifyClient;
+  /** Called once per tool call with the tool name and outcome only (never arguments or results). */
+  onToolCall?: (tool: string, status: ToolCallStatus) => void;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -90,8 +94,28 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
   const now = runtime.now ?? Date.now;
   const sleep = runtime.sleep ?? defaultSleep;
   const { client } = runtime;
+  const register = ((name: string, config: unknown, handler: (...args: unknown[]) => Promise<CallToolResult>) =>
+    (server.registerTool as (n: string, c: unknown, h: (...args: unknown[]) => Promise<CallToolResult>) => unknown).call(
+      server,
+      name,
+      config,
+      async (...args: unknown[]) => {
+        let status: ToolCallStatus = 'error';
+        try {
+          const result = await handler(...args);
+          status = result.isError ? 'error' : 'ok';
+          return result;
+        } finally {
+          try {
+            runtime.onToolCall?.(name, status);
+          } catch {
+            /* logging must never break a tool call */
+          }
+        }
+      },
+    )) as unknown as McpServer['registerTool'];
 
-  server.registerTool(
+  register(
     'check_action',
     {
       title: 'Check action',
@@ -113,7 +137,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
       }),
   );
 
-  server.registerTool(
+  register(
     'decide_action',
     {
       title: 'Decide action',
@@ -131,7 +155,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
       }),
   );
 
-  server.registerTool(
+  register(
     'get_decision',
     {
       title: 'Get decision',
@@ -162,7 +186,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
       }),
   );
 
-  server.registerTool(
+  register(
     'list_policies',
     {
       title: 'List policies',
@@ -179,7 +203,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
       }),
   );
 
-  server.registerTool(
+  register(
     'test_policies',
     {
       title: 'Test policies',
@@ -198,7 +222,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
 
   if (!client.usesApiKey()) return;
 
-  server.registerTool(
+  register(
     'plan_policy_changes',
     {
       title: 'Plan policy changes',
@@ -215,7 +239,7 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
       }),
   );
 
-  server.registerTool(
+  register(
     'check_mcp_tool_call',
     {
       title: 'Check MCP tool call',

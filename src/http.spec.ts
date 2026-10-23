@@ -371,6 +371,33 @@ describe('HTTP server', () => {
     assert.equal(logText.includes(SECRET), false);
   });
 
+  it('logs tool name, org id, outcome and time per tool call, without arguments, user id or token', async () => {
+    const ORG = '11111111-2222-4333-8444-555555555555';
+    const base = await listen({
+      introspectionSecret: SECRET,
+      fetchImpl: async (input) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        if (url.endsWith('/oauth/introspect')) {
+          return jsonResponse({ active: true, scope: 'policies:read', aud: 'https://mcp.vulnify.io/mcp', sub: 'user-secret-id', org: ORG });
+        }
+        return jsonResponse({ apiVersion: 'vulnify.io/v1', policies: [] });
+      },
+    });
+    const response = await fetch(`${base}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'list_policies', arguments: {} } }),
+    });
+    assert.equal(response.status, 200);
+    await response.text();
+    const lines = logs.filter((line) => line.startsWith('tool_call '));
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /^tool_call ts=\d{4}-\d{2}-\d{2}T[^ ]+Z tool=list_policies org=11111111-2222-4333-8444-555555555555 status=ok$/);
+    const all = logs.join('\n');
+    assert.equal(all.includes('user-secret-id'), false);
+    assert.equal(all.includes(TOKEN), false);
+  });
+
   it('caches an active introspection for at most 60s and never past exp', async () => {
     let now = 1_700_000_000_000;
     let introspects = 0;

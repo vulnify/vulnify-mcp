@@ -153,6 +153,7 @@ export function createHttpApp(options: HttpAppOptions): Express {
     }
 
     let client: VulnifyClient;
+    let orgForLog = 'unknown';
     if (credential.kind === 'oauth') {
       const introspection = await introspector.introspect(credential.accessToken);
       if (!introspection.ok) {
@@ -170,6 +171,7 @@ export function createHttpApp(options: HttpAppOptions): Express {
         });
         return;
       }
+      orgForLog = introspection.org ?? 'unknown';
       client = new VulnifyClient({
         baseUrl: options.baseUrl,
         fetch: options.fetch,
@@ -190,13 +192,18 @@ export function createHttpApp(options: HttpAppOptions): Express {
         });
         return;
       }
+      orgForLog = 'api_key';
       client = new VulnifyClient({
         apiKey: credential.apiKey,
         baseUrl: options.baseUrl,
         fetch: options.fetch,
       });
     }
-    const mcp = createVulnifyServer({ client });
+    const mcp = createVulnifyServer({
+      client,
+      // Tool name, organization id, outcome and time only: no arguments, results, IPs, user ids or tokens.
+      onToolCall: (tool, status) => logger(`tool_call ts=${new Date().toISOString()} tool=${tool} org=${orgForLog} status=${status}`),
+    });
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
       enableJsonResponse: true,
