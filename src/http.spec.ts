@@ -16,11 +16,11 @@ const TOKEN = 'vln_oat_http_access_token';
 const WRITER = 'vln_oat_http_writer_token';
 const SECRET = 'introspection-secret-for-tests';
 const CHALLENGE =
-  'Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"';
+  'Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test reviews:read reviews:decide"';
 const PROTECTED_RESOURCE = {
   resource: 'https://mcp.vulnify.io/mcp',
   authorization_servers: ['https://api.vulnify.io'],
-  scopes_supported: ['decisions:read', 'decisions:write', 'policies:read', 'policies:test'],
+  scopes_supported: ['decisions:read', 'decisions:write', 'policies:read', 'policies:test', 'reviews:read', 'reviews:decide'],
   bearer_methods_supported: ['header'],
 };
 

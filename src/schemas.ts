@@ -278,3 +278,35 @@ export const planOutput = loose({
     )
     .describe('Creates, updates, deletes, and unchanged names.'),
 });
+
+export const listPendingReviewsInput = z
+  .object({
+    limit: z.number().int().min(1).max(50).optional().describe('How many pending reviews to return (1-50, default 20).'),
+  })
+  .strict();
+
+const reviewIdSchema = z.string().uuid().describe('Review id: the event id from list_pending_reviews or decide_action.');
+
+export const approveReviewInput = z
+  .object({
+    id: reviewIdSchema,
+    mfaCode: z
+      .string()
+      .regex(/^\d{6}$/)
+      .describe(
+        'The current 6-digit code from the authenticator app of the person approving. Ask the person for it in this conversation every time. Never guess, reuse or invent a code.',
+      ),
+    note: z.string().max(500).optional().describe('Why the person approved, in their words. Stored in the audit log.'),
+  })
+  .strict();
+
+export const denyReviewInput = z
+  .object({
+    id: reviewIdSchema,
+    note: z.string().max(500).optional().describe('Why the person denied, in their words. Stored in the audit log.'),
+  })
+  .strict();
+
+export type ListPendingReviewsInput = z.infer<typeof listPendingReviewsInput>;
+export type ApproveReviewInput = z.infer<typeof approveReviewInput>;
+export type DenyReviewInput = z.infer<typeof denyReviewInput>;

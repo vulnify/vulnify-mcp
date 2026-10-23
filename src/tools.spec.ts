@@ -182,6 +182,65 @@ describe('tools', () => {
     }
   });
 
+  it('adds review tools only for OAuth scopes, and approve sends the person\'s code', async () => {
+    const seen: { url: string; body: unknown }[] = [];
+    const reviewer = new VulnifyClient({
+      baseUrl: BASE,
+      oauth: { accessToken: 'vln_oat_unit_access_token', scopes: ['decisions:read', 'reviews:read', 'reviews:decide'] },
+      fetch: async (url, init) => {
+        seen.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+        if (String(url).includes('/reviews?')) {
+          return jsonResponse(200, {
+            items: [{ id: '9b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e', agent: { name: 'bot' }, resource: { name: 'CRM' }, action: 'SEND_EMAIL', riskLevel: 'MEDIUM', riskScore: 50, reasons: ['r'], content: 'secret body' }],
+            total: 1,
+          });
+        }
+        return jsonResponse(200, { id: '9b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e', reviewStatus: 'APPROVED' });
+      },
+    });
+    const server = createVulnifyServer({ client: reviewer });
+    const mcp = new Client({ name: 'review-tools', version: '0.0.0' });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    await mcp.connect(clientTransport);
+    try {
+      const tools = (await mcp.listTools()).tools;
+      const byName = new Map(tools.map((t) => [t.name, t]));
+      assert.ok(byName.has('list_pending_reviews'));
+      assert.equal(byName.get('approve_review')?.annotations?.destructiveHint, true);
+      assert.equal(byName.get('deny_review')?.annotations?.destructiveHint, true);
+      assert.ok((byName.get('approve_review')?.inputSchema.required ?? []).includes('mfaCode'));
+
+      const listed = await mcp.callTool({ name: 'list_pending_reviews', arguments: {} });
+      assert.doesNotMatch(JSON.stringify(listed), /secret body/);
+      const noCode = await mcp.callTool({ name: 'approve_review', arguments: { id: '9b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e' } });
+      assert.equal(noCode.isError, true);
+      await mcp.callTool({ name: 'approve_review', arguments: { id: '9b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e', mfaCode: '123456', note: 'ok' } });
+      const approve = seen.find((c) => c.url.endsWith('/approve'));
+      assert.deepEqual(approve?.body, { note: 'ok', mfaCode: '123456' });
+      await mcp.callTool({ name: 'deny_review', arguments: { id: '9b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e' } });
+      assert.ok(seen.some((c) => c.url.endsWith('/v1/mcp/reviews/9b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e/deny')));
+    } finally {
+      await mcp.close();
+      await server.close();
+    }
+
+    const member = new VulnifyClient({ baseUrl: BASE, oauth: { accessToken: 'vln_oat_unit_access_token', scopes: ['reviews:read'] }, fetch: async () => jsonResponse(200, {}) });
+    const s2 = createVulnifyServer({ client: member });
+    const c2 = new Client({ name: 'member-tools', version: '0.0.0' });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await s2.connect(b);
+    await c2.connect(a);
+    try {
+      const names = (await c2.listTools()).tools.map((t) => t.name);
+      assert.ok(names.includes('list_pending_reviews'));
+      assert.ok(!names.includes('approve_review'));
+    } finally {
+      await c2.close();
+      await s2.close();
+    }
+  });
+
   it('publishes a title and the four behavior hints for every tool', async () => {
     const { fetch: fetchImpl } = installFetch(() => jsonResponse(200, { results: [] }));
     const { mcp, close } = await withClient(fetchImpl);

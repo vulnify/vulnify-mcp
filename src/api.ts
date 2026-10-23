@@ -60,6 +60,9 @@ function oauthApiKeyOnly(tool: string): string {
   return `${tool} requires a Vulnify API key (vln_live_... or vln_test_...). An OAuth access token cannot call it because the API has no /v1/mcp route for this tool.`;
 }
 
+const REVIEWS_OAUTH_ONLY =
+  'Reviews can only be resolved by a signed-in person (Vulnify connector with OAuth). An API key cannot approve or deny.';
+
 export class VulnifyClient {
   private readonly authorization: string;
   private readonly mode: 'api_key' | 'oauth';
@@ -112,6 +115,23 @@ export class VulnifyClient {
   getEvent(id: string): Promise<ApiResult> {
     const encoded = encodeURIComponent(id);
     return this.invoke('get_decision', 'decisions:read', 'GET', `/v1/events/${encoded}`, `/v1/mcp/events/${encoded}`);
+  }
+
+  /** OAuth only: the API has no API-key route for reviews. */
+  listReviews(limit: number): Promise<ApiResult> {
+    if (this.mode === 'api_key') throw new Error(REVIEWS_OAUTH_ONLY);
+    return this.invoke('list_pending_reviews', 'reviews:read', 'GET', '', `/v1/mcp/reviews?status=PENDING&limit=${limit}`);
+  }
+
+  resolveReview(id: string, decision: 'approve' | 'deny', body: { note?: string; mfaCode?: string }): Promise<ApiResult> {
+    if (this.mode === 'api_key') throw new Error(REVIEWS_OAUTH_ONLY);
+    const path = `/v1/mcp/reviews/${encodeURIComponent(id)}/${decision}`;
+    return this.invoke('resolve_review', 'reviews:decide', 'POST', '', path, defined(body));
+  }
+
+  /** True when this session's token carries the scope (OAuth). API keys have no scopes. */
+  hasScope(scope: string): boolean {
+    return this.mode === 'oauth' && this.scopes.has(scope);
   }
 
   checkMcpToolCall(body: Record<string, unknown>, idempotencyKey?: string): Promise<ApiResult> {

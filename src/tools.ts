@@ -16,6 +16,12 @@ import {
   policyListOutput,
   policyTestOutput,
   testPoliciesInput,
+  listPendingReviewsInput,
+  approveReviewInput,
+  denyReviewInput,
+  type ApproveReviewInput,
+  type DenyReviewInput,
+  type ListPendingReviewsInput,
   type CheckActionInput,
   type CheckMcpToolCallInput,
   type DecideActionInput,
@@ -44,11 +50,11 @@ interface ToolAnnotations {
 /** False because every tool acts on the caller's own Vulnify organization. */
 const OPEN_WORLD = false;
 
-function annotations(title: string, readOnly: boolean, idempotent: boolean): ToolAnnotations {
+function annotations(title: string, readOnly: boolean, idempotent: boolean, destructive = false): ToolAnnotations {
   return {
     title,
     readOnlyHint: readOnly,
-    destructiveHint: false,
+    destructiveHint: destructive,
     idempotentHint: idempotent,
     openWorldHint: OPEN_WORLD,
   };
@@ -220,7 +226,10 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
       }),
   );
 
-  if (!client.usesApiKey()) return;
+  if (!client.usesApiKey()) {
+    registerReviewTools(register, client);
+    return;
+  }
 
   register(
     'plan_policy_changes',
@@ -256,4 +265,89 @@ export function registerTools(server: McpServer, runtime: ToolRuntime): void {
         return { ...asRecord(result.body), idempotentReplay: replayed(result.headers) };
       }),
   );
+}
+
+/** Fields of a pending review worth showing a person. Content and DLP matches are never part of it. */
+function reviewSummary(item: Record<string, unknown>): Record<string, unknown> {
+  const pick = (v: unknown) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {});
+  return {
+    id: item.id,
+    agent: pick(item.agent).name ?? item.agentName ?? null,
+    action: item.action ?? null,
+    resource: pick(item.resource).name ?? item.resourceName ?? null,
+    riskLevel: item.riskLevel ?? null,
+    riskScore: item.riskScore ?? null,
+    reasons: Array.isArray(item.reasons) ? item.reasons.slice(0, 3) : [],
+    policy: pick(item.policy).name ?? null,
+    createdAt: item.createdAt ?? null,
+    reviewExpiresAt: item.reviewExpiresAt ?? null,
+    approverRoles: pick(item.approval).approverRoles ?? null,
+  };
+}
+
+/**
+ * In-client review tools (OAuth sessions only).
+ *
+ * Safety model: an approval through this server must carry the approving person's current authenticator
+ * code (mfaCode). The API enforces it for every risk level on /v1/mcp, so a model cannot approve by itself
+ * even if it calls the tool without asking. The API also refuses approvals of actions the same person
+ * requested (no self-approval: REVIEWs created through this connector need someone else), applies the
+ * policy's approver roles, and writes an audit entry with via = oauth and the client id. Deny needs no
+ * code because it can only make things stricter. Both tools are marked destructive so clients ask the
+ * person before running them.
+ */
+function registerReviewTools(register: McpServer['registerTool'], client: VulnifyClient): void {
+  if (client.hasScope('reviews:read')) {
+    (register as unknown as (n: string, c: unknown, h: (input: ListPendingReviewsInput) => Promise<CallToolResult>) => void)(
+      'list_pending_reviews',
+      {
+        title: 'List pending reviews',
+        description:
+          'List actions waiting for a person to approve or deny in the organization (GET /v1/mcp/reviews?status=PENDING). Read-only. Shows agent, action, resource, risk, reasons and expiry; never the action content. Use it when the person asks what is waiting for approval.',
+        inputSchema: listPendingReviewsInput,
+        annotations: annotations('List pending reviews', true, true),
+      },
+      async (input) =>
+        run(async () => {
+          const body = asRecord((await client.listReviews(input.limit ?? 20)).body);
+          const items = Array.isArray(body.items) ? (body.items as Record<string, unknown>[]) : [];
+          return { items: items.map(reviewSummary), total: body.total ?? items.length };
+        }),
+    );
+  }
+  if (!client.hasScope('reviews:decide')) return;
+  (register as unknown as (n: string, c: unknown, h: (input: ApproveReviewInput) => Promise<CallToolResult>) => void)(
+    'approve_review',
+    {
+      title: 'Approve review (needs the person)',
+      description:
+        'Approve a pending review on behalf of the person you are talking to (POST /v1/mcp/reviews/{id}/approve). Only call this after the person explicitly said to approve this specific review in this conversation. You must ask the person for the current 6-digit code from their authenticator app and pass it as mfaCode; never guess, reuse or make up a code. Vulnify refuses approvals without a valid code, approvals of actions the same person requested (another member must approve those), and approvals by roles the policy does not allow. Never approve an action you requested yourself in order to continue your own task. 403 MFA_REQUIRED_FOR_AI_APPROVAL: the person must turn on two-factor authentication in Vulnify or approve in the dashboard.',
+      inputSchema: approveReviewInput,
+      annotations: annotations('Approve review', false, false, true),
+    },
+    async (input) =>
+      run(async () => {
+        const result = await client.resolveReview(input.id, 'approve', { note: input.note, mfaCode: input.mfaCode });
+        return reviewSummaryResolved(asRecord(result.body));
+      }),
+  );
+  (register as unknown as (n: string, c: unknown, h: (input: DenyReviewInput) => Promise<CallToolResult>) => void)(
+    'deny_review',
+    {
+      title: 'Deny review',
+      description:
+        'Deny a pending review on behalf of the person you are talking to (POST /v1/mcp/reviews/{id}/deny). Only call this after the person explicitly said to deny this specific review. The action stays blocked. Written to the audit log with the person as reviewer.',
+      inputSchema: denyReviewInput,
+      annotations: annotations('Deny review', false, false, true),
+    },
+    async (input) =>
+      run(async () => {
+        const result = await client.resolveReview(input.id, 'deny', { note: input.note });
+        return reviewSummaryResolved(asRecord(result.body));
+      }),
+  );
+}
+
+function reviewSummaryResolved(body: Record<string, unknown>): Record<string, unknown> {
+  return { ...reviewSummary(body), reviewStatus: body.reviewStatus ?? null, reviewedAt: body.reviewedAt ?? null };
 }
