@@ -36,7 +36,7 @@
 
 Sign in with Vulnify (OAuth 2.1) at [`https://mcp.vulnify.io/mcp`](https://mcp.vulnify.io/mcp). That hosted server speaks stateless Streamable HTTP. The local path is `npx -y @vulnify/mcp` with `VULNIFY_API_KEY`.
 
-`check_action` is a dry run. It skips the PII scan and records nothing. `decide_action` records a real decision. A `REVIEW` waits for a person. This server cannot approve or deny one.
+`check_action` is a dry run. It skips the PII scan and records nothing. `decide_action` records a real decision. A `REVIEW` waits for a person. On a signed-in (OAuth) session, that person can approve or deny it from the AI client with `approve_review` / `deny_review`; approving needs their current authenticator code. See [In-client approvals](#in-client-approvals).
 
 Application code that should decide inside your own process uses the [Node SDK](https://github.com/vulnify/vulnify-sdk) (`@vulnify/sdk`). This package does not depend on the SDK. The SDK turns some transport failures into a fail-closed decision. This server returns those failures as MCP tool errors, so a model does not read them as `ALLOW`.
 
@@ -49,7 +49,7 @@ The source of truth is [docs.vulnify.io/mcp](https://docs.vulnify.io/mcp/). The 
 Connect to `https://mcp.vulnify.io/mcp`. Leave API-key and OAuth client fields empty. The client receives HTTP 401 and:
 
 ```
-WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"
+WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test reviews:read reviews:decide"
 ```
 
 The body is `{"error":"unauthorized","message":"Sign in with Vulnify, or send an API key as Authorization: Bearer or X-Vulnify-Key:."}`. Protected-resource metadata lists the authorization server `https://api.vulnify.io`.
@@ -62,8 +62,10 @@ You choose an organization and allow the scopes the client requests:
 | `decisions:write` | `decide_action` |
 | `policies:read` | `list_policies` |
 | `policies:test` | `check_action`, `test_policies` |
+| `reviews:read` | `list_pending_reviews` |
+| `reviews:decide` (owners and admins) | `approve_review`, `deny_review` |
 
-After you allow access, the hosted server offers those five tools. `plan_policy_changes` and `check_mcp_tool_call` are not in that list. They need an API key. A missing scope comes back as a tool error that names the scope. That error is not an `ALLOW`. Revoke the connection under Settings > Connected apps: [app.vulnify.io/settings/connected-apps](https://app.vulnify.io/settings/connected-apps).
+After you allow access, the hosted server offers those tools (five, plus the review tools your role allows). `plan_policy_changes` and `check_mcp_tool_call` are not in that list. They need an API key. A missing scope comes back as a tool error that names the scope. That error is not an `ALLOW`. Revoke the connection under Settings > Connected apps: [app.vulnify.io/settings/connected-apps](https://app.vulnify.io/settings/connected-apps).
 
 #### Claude
 
@@ -233,16 +235,19 @@ Every tool has a title and `readOnlyHint`, `destructiveHint`, `idempotentHint`, 
 | `test_policies` | `POST /v1/policies/test` | No | true | Up to 200 cases. Skips the PII scan. Proposed `policies` are not saved. |
 | `plan_policy_changes` | `POST /v1/policies/apply` | No | true | `dryRun` is forced to true. Needs an org-wide LIVE key. |
 | `check_mcp_tool_call` | `POST /v1/gateway/mcp` | Yes | false | Maps a tool name to an action and records the decision. Does not run the tool. |
+| `list_pending_reviews` | `GET /v1/mcp/reviews?status=PENDING` | No | true | OAuth only, `reviews:read`. Metadata only, never the action content. |
+| `approve_review` | `POST /v1/mcp/reviews/{id}/approve` | Yes (audit) | false | OAuth only, `reviews:decide`. Requires `mfaCode` from the person. `destructiveHint: true`. |
+| `deny_review` | `POST /v1/mcp/reviews/{id}/deny` | Yes (audit) | false | OAuth only, `reviews:decide`. `destructiveHint: true`. |
 
-`destructiveHint` is false on every tool. `openWorldHint` is false on every tool, because each call stays inside the caller's own Vulnify organization. `idempotentHint` is true for the read-only tools and false for `decide_action` and `check_mcp_tool_call`. An `idempotencyKey` makes a retry of a recorded decision return the same event.
+`destructiveHint` is false on every tool except `approve_review` and `deny_review`, so clients ask the person before running them. `openWorldHint` is false on every tool, because each call stays inside the caller's own Vulnify organization. `idempotentHint` is true for the read-only tools and false for `decide_action` and `check_mcp_tool_call`. An `idempotencyKey` makes a retry of a recorded decision return the same event.
 
 Policy list, test, and plan calls are limited to 60 requests per minute per key. Batch dry runs with `test_policies`. `POST /v1/events` has its own limit. The OpenAPI text says only that the limit was exceeded.
 
 ## Safety
 
-This server cannot change a review and cannot save a policy.
+This server cannot save a policy, and an agent cannot approve a review by itself.
 
-- There is no approve tool and no deny tool. A human resolves a `REVIEW` in Vulnify.
+- `approve_review` and `deny_review` exist only on signed-in (OAuth) sessions with the `reviews:decide` scope (owners and admins). See [In-client approvals](#in-client-approvals).
 - There is no apply tool. `plan_policy_changes` calls `POST /v1/policies/apply` with `dryRun: true` on every request. The tool input has no `dryRun` field. The server sets `dryRun` last, so a caller cannot turn the dry run off. The tool returns the diff.
 - `POST /v1/gateway/http` is not a tool. On `ALLOW`, that API endpoint forwards the HTTP call. This server does not.
 
@@ -261,8 +266,26 @@ User login is the hosted HTTP server. The local stdio process still uses an API 
 | `list_policies` | `policies:read` | `GET /v1/mcp/policies` |
 | `plan_policy_changes` | API key and stdio only | Omitted from OAuth `tools/list` |
 | `check_mcp_tool_call` | API key and stdio only | Omitted from OAuth `tools/list` |
+| `list_pending_reviews` | `reviews:read` | `GET /v1/mcp/reviews` |
+| `approve_review` | `reviews:decide` | `POST /v1/mcp/reviews/{id}/approve` |
+| `deny_review` | `reviews:decide` | `POST /v1/mcp/reviews/{id}/deny` |
 
 A token that is missing the scope gets a tool error that names the scope. That error is not an `ALLOW`. Active introspection results are reused for at most 60 seconds, and never past `exp`.
+
+## In-client approvals
+
+A person can resolve a `REVIEW` without leaving Claude, Cursor or Claude Code. The rules that keep the agent from approving its own work:
+
+1. **Human proof on every approval.** `approve_review` requires `mfaCode`, the current 6-digit code from the person's authenticator app. The API enforces it on `/v1/mcp` at every risk level (`MFA_REQUIRED_FOR_AI_APPROVAL` when the account has no two-factor authentication, `MFA_STEP_UP_REQUIRED` / `MFA_CODE_INVALID` otherwise). The model cannot produce the code, so it has to ask the person each time. Codes rotate every 30 seconds.
+2. **No self-approval.** A `REVIEW` created through this connector is requested by the signed-in person, and the API refuses to let the same person approve it (`SELF_APPROVAL`). Another member approves those. In-client approval is for actions requested by other agents (SDK, API key, gateway).
+3. **Roles.** `reviews:decide` is only granted to owners and admins, and the policy's approver roles still apply. Members get `list_pending_reviews` only.
+4. **Client confirmation.** Both tools carry `destructiveHint: true`, so clients show a confirmation before running them.
+5. **Audit.** Each decision is written to the audit log with `via: oauth`, the OAuth client id, the reviewer and the note.
+6. **Deny is one step.** Denying needs no code: it can only keep an action blocked.
+
+The hosted server runs stateless JSON responses, so it does not use MCP elicitation today. When sessions are enabled, the code prompt can move into an elicitation form so it never passes through the model.
+
+Existing connections were authorized before the review scopes existed. Disconnect and connect again (Settings > Connected apps) to grant `reviews:read` and `reviews:decide`.
 
 ## Distinct from the MCP gateway
 

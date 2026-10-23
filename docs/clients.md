@@ -9,7 +9,7 @@ The Vulnify MCP server lets an agent ask whether an action may run. The primary 
 Connect to `https://mcp.vulnify.io/mcp`. The server speaks Streamable HTTP and keeps no session. Leave API-key and OAuth client fields empty. The client receives HTTP 401 and:
 
 ```
-WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test"
+WWW-Authenticate: Bearer realm="https://mcp.vulnify.io/mcp", resource_metadata="https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp", scope="decisions:read decisions:write policies:read policies:test reviews:read reviews:decide"
 ```
 
 The body is `{"error":"unauthorized","message":"Sign in with Vulnify, or send an API key as Authorization: Bearer or X-Vulnify-Key:."}`. Protected-resource metadata lists the authorization server `https://api.vulnify.io`.
@@ -22,8 +22,10 @@ You choose an organization and allow the scopes the client requests:
 | `decisions:write` | `decide_action` |
 | `policies:read` | `list_policies` |
 | `policies:test` | `check_action`, `test_policies` |
+| `reviews:read` | `list_pending_reviews` |
+| `reviews:decide` (owners and admins) | `approve_review`, `deny_review` |
 
-After you allow access, the hosted server offers those five tools. `plan_policy_changes` and `check_mcp_tool_call` are not in that list. They need an API key, through a manual config or local `npx -y @vulnify/mcp`. A missing scope comes back as a tool error that names the scope. That error is not an `ALLOW`.
+After you allow access, the hosted server offers those tools (five, plus the review tools your role allows). `plan_policy_changes` and `check_mcp_tool_call` are not in that list. They need an API key, through a manual config or local `npx -y @vulnify/mcp`. A missing scope comes back as a tool error that names the scope. That error is not an `ALLOW`.
 
 Revoke the connection under Settings > Connected apps: [app.vulnify.io/settings/connected-apps](https://app.vulnify.io/settings/connected-apps).
 

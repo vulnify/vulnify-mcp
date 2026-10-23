@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+feat: in-client review approvals
+
+- OAuth sessions list `list_pending_reviews` (`reviews:read`) and, for owners and admins, `approve_review` and `deny_review` (`reviews:decide`). The 401 challenge and protected-resource metadata request both review scopes.
+- `approve_review` requires `mfaCode`, the person's current authenticator code. The API enforces it on every `/v1/mcp` approval (api `MFA_REQUIRED_FOR_AI_APPROVAL`). Self-approval stays refused. Both tools are `destructiveHint: true`.
+- `list_pending_reviews` returns metadata only (agent, action, resource, risk, reasons, expiry).
+- Instructions no longer say reviews cannot be resolved through this server.
+
 ## 0.1.4
 
 docs: Sign in with Vulnify comes first

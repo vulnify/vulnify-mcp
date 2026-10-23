@@ -33,7 +33,7 @@ export const OAUTH_ISSUER = 'https://api.vulnify.io';
 export const PROTECTED_RESOURCE_METADATA_URL = 'https://mcp.vulnify.io/.well-known/oauth-protected-resource/mcp';
 
 /** Scopes this MCP server asks for. The authorization server may advertise a wider set. */
-export const MCP_OAUTH_SCOPES = ['decisions:read', 'decisions:write', 'policies:read', 'policies:test'] as const;
+export const MCP_OAUTH_SCOPES = ['decisions:read', 'decisions:write', 'policies:read', 'policies:test', 'reviews:read', 'reviews:decide'] as const;
 export const MCP_OAUTH_SCOPE = MCP_OAUTH_SCOPES.join(' ');
 
 /**
@@ -59,7 +59,7 @@ export const INSTRUCTIONS = [
   'Use check_action only for what-if questions when you are not about to act. It skips the PII scan and records nothing.',
   'This is guidance for the model. Vulnify does not intercept other tools by itself; hooks or the Vulnify gateway enforce it.',
   'check_mcp_tool_call also records a decision, judged by a downstream MCP tool name.',
-  'REVIEW cannot be approved or denied through this server.',
+  'Reviews: list_pending_reviews shows what waits for a person. approve_review and deny_review act for the person you are talking to, only after they explicitly ask for that specific review. approve_review needs the current code from their authenticator app, which you must ask them for each time; never invent one. Never approve an action you requested yourself to continue your own task. Without the reviews:decide scope (members) these tools are not available: tell the person to approve in Vulnify.',
 ].join(' ');
 
 /** Instructions for an OAuth session, which does not list the API-key-only tools. */
