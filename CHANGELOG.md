@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Claude Code plugin in `plugins/vulnify`. The marketplace is `.claude-plugin/marketplace.json`. Install with `/plugin marketplace add vulnify/vulnify-mcp`, then `/plugin install vulnify@vulnify-mcp`. The plugin connects to `https://mcp.vulnify.io/mcp` and signs in with Vulnify. The PreToolUse hook from `@vulnify/cli` 0.3.0 checks risky tool calls before they run.
+
 ## 0.1.4
 
 docs: Sign in with Vulnify comes first

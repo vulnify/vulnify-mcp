@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "vulnify",
+  "displayName": "Vulnify",
+  "version": "0.1.0",
+  "description": "Runtime authorization for AI agents. Sign in with Vulnify, and check risky tool calls before they run. finalDecision is ALLOW, REVIEW, or BLOCK.",
+  "author": {
+    "name": "Vulnify",
+    "email": "contact@vulnify.io",
+    "url": "https://www.vulnify.io"
+  },
+  "homepage": "https://docs.vulnify.io/mcp/",
+  "repository": "https://github.com/vulnify/vulnify-mcp",
+  "license": "MIT",
+  "keywords": ["vulnify", "authorization", "security", "mcp"],
+  "icon": "./logo.png",
+  "documentationUrl": "https://docs.vulnify.io/mcp/",
+  "supportUrl": "https://github.com/vulnify/vulnify-mcp/issues",
+  "privacyPolicyUrl": "https://app.vulnify.io/privacy",
+  "termsOfServiceUrl": "https://app.vulnify.io/terms",
+  "userConfig": {
+    "vulnify_api_key": {
+      "type": "string",
+      "title": "Vulnify API key",
+      "description": "Key for the PreToolUse hook. Create one at app.vulnify.io/api-keys. A TEST key keeps events in the sandbox. The hosted MCP server uses Sign in with Vulnify and does not use this key.",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "metadata": {
+    "hookPackage": "@vulnify/cli",
+    "hookVersion": "0.3.0"
+  }
+}

@@ -93,6 +93,22 @@ Open [grok.com/connectors](https://grok.com/connectors), then New Connector > Cu
 
 #### Claude Code
 
+Add the Vulnify marketplace, then install the plugin. It connects to `https://mcp.vulnify.io/mcp` and signs in with Vulnify. A PreToolUse hook checks risky tool calls before they run. Claude Code asks for an API key for that hook when you enable the plugin. The hosted tools still use sign-in, not that key.
+
+```bash
+claude plugin marketplace add vulnify/vulnify-mcp
+claude plugin install vulnify@vulnify-mcp
+```
+
+Inside a session:
+
+```
+/plugin marketplace add vulnify/vulnify-mcp
+/plugin install vulnify@vulnify-mcp
+```
+
+To add only the hosted server, without the hook:
+
 ```bash
 claude mcp add --transport http vulnify https://mcp.vulnify.io/mcp
 ```
@@ -161,7 +177,7 @@ Claude Code with an API key:
 claude mcp add --transport http vulnify https://mcp.vulnify.io/mcp --header "Authorization: Bearer vln_test_your_key"
 ```
 
-Prefer an environment variable over a key written into the shell history. For sign-in, use the Claude Code command with no header.
+Prefer an environment variable over a key written into the shell history. For sign-in, use the Claude Code command with no header. The plugin hook asks for its own API key when you enable it. Do not put that key on `claude mcp add`.
 
 Claude Desktop can run the local process. On macOS the file is `~/Library/Application Support/Claude/claude_desktop_config.json`. On Windows it is `%APPDATA%\Claude\claude_desktop_config.json`. Restart the app after saving.
 
