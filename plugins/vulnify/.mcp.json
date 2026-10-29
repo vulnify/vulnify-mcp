@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "vulnify": {
+      "type": "http",
+      "url": "https://mcp.vulnify.io/mcp"
+    }
+  }
+}

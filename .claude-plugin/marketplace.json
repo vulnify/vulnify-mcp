@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "vulnify-mcp",
+  "description": "Vulnify runtime authorization for Claude Code. Every agent action gets ALLOW, REVIEW, or BLOCK.",
+  "owner": {
+    "name": "Vulnify",
+    "email": "contact@vulnify.io",
+    "url": "https://www.vulnify.io"
+  },
+  "plugins": [
+    {
+      "name": "vulnify",
+      "source": "./plugins/vulnify",
+      "description": "Runtime authorization for AI agents. Sign in with Vulnify, and check risky tool calls before they run. finalDecision is ALLOW, REVIEW, or BLOCK.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Vulnify",
+        "email": "contact@vulnify.io",
+        "url": "https://www.vulnify.io"
+      },
+      "homepage": "https://docs.vulnify.io/mcp/",
+      "repository": "https://github.com/vulnify/vulnify-mcp",
+      "license": "MIT",
+      "keywords": ["vulnify", "authorization", "security", "mcp"],
+      "category": "security"
+    }
+  ]
+}
