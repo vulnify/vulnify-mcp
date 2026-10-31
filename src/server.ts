@@ -4,6 +4,7 @@ import {
   DECISIONS_URI,
   INSTRUCTIONS,
   OAUTH_INSTRUCTIONS,
+  QUICKSTART_SAMPLE,
   SERVER_ICONS,
   SERVER_NAME,
   SERVER_TITLE,
@@ -40,6 +41,40 @@ export function createVulnifyServer(runtime: ToolRuntime): McpServer {
 }
 
 function registerPrompts(server: McpServer): void {
+  server.registerPrompt(
+    'vulnify_quickstart',
+    {
+      title: 'Vulnify quickstart',
+      description:
+        'First run: record one sample decision (export 800 customer records to an external email) and show the live REVIEW. No setup needed.',
+    },
+    async () => ({
+      description: 'Record one sample decision and show it.',
+      messages: [
+        {
+          role: 'user',
+          content: {
+            type: 'text',
+            text: [
+              'Show me Vulnify working with one sample. This is a sample: no real data moves.',
+              'Call decide_action once with exactly:',
+              `agent: ${QUICKSTART_SAMPLE.agent}`,
+              `action: ${QUICKSTART_SAMPLE.action}`,
+              `resource: ${QUICKSTART_SAMPLE.resource}`,
+              `destination: ${QUICKSTART_SAMPLE.destination}`,
+              `recordsAffected: ${QUICKSTART_SAMPLE.recordsAffected}`,
+              '',
+              'Then show me finalDecision, the risk level and the reasons in a short list.',
+              'If finalDecision is REVIEW, tell me it is waiting for approval in the Vulnify app (https://app.vulnify.io) and that I can approve or deny it there.',
+              'If the result has account.message or agentNotice.message, show it to me.',
+              'Finally, say in one sentence that from now on you will call decide_action before risky actions in this chat: sending data out, deleting, exporting, pushing code or deploying.',
+            ].join('\n'),
+          },
+        },
+      ],
+    }),
+  );
+
   server.registerPrompt(
     'guard_action',
     {
