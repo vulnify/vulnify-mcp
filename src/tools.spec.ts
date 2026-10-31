@@ -172,13 +172,30 @@ describe('tools', () => {
       assert.equal(mcp.getInstructions(), OAUTH_INSTRUCTIONS);
       assert.deepEqual(
         (await mcp.listPrompts()).prompts.map((prompt) => prompt.name).sort(),
-        ['guard_action', 'review_policies'],
+        ['guard_action', 'review_policies', 'vulnify_quickstart'],
       );
       assert.equal((await mcp.listResources()).resources[0]?.uri, DECISIONS_URI);
       assert.equal(mcp.getServerVersion()?.websiteUrl, WEBSITE_URL);
     } finally {
       await mcp.close();
       await server.close();
+    }
+  });
+
+  it('vulnify_quickstart asks for one sample EXPORT_DATA of 800 records to EXTERNAL_EMAIL with decide_action', async () => {
+    const { fetch: fetchImpl } = installFetch(() => jsonResponse(200, {}));
+    const { mcp, close } = await withClient(fetchImpl);
+    try {
+      const prompt = await mcp.getPrompt({ name: 'vulnify_quickstart' });
+      const text = prompt.messages.map((m) => (m.content.type === 'text' ? m.content.text : '')).join('\n');
+      assert.match(text, /decide_action/);
+      assert.match(text, /action: EXPORT_DATA/);
+      assert.match(text, /destination: EXTERNAL_EMAIL/);
+      assert.match(text, /recordsAffected: 800/);
+      assert.match(text, /sample/);
+      assert.match(text, /app\.vulnify\.io/);
+    } finally {
+      await close();
     }
   });
 
@@ -220,6 +237,9 @@ describe('tools', () => {
         assert.match(text, /records one real decision/);
         assert.match(text, /EMAIL_NOT_VERIFIED/);
         assert.match(text, /account\.message/);
+        assert.match(text, /agentNotice\.message/);
+        assert.match(text, /git push/);
+        assert.match(text, /EXPORT_DATA/);
       }
       const plan = byName.get('plan_policy_changes');
       assert.equal(plan?.inputSchema.properties?.dryRun, undefined);

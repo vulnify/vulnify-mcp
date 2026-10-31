@@ -219,7 +219,7 @@ describe('HTTP server', () => {
     }
     assert.deepEqual(
       cardBody.prompts.map((prompt) => prompt.name).sort(),
-      ['guard_action', 'review_policies'],
+      ['guard_action', 'review_policies', 'vulnify_quickstart'],
     );
     assert.equal(cardBody.resources[0]?.uri, 'vulnify://docs/decisions');
     assert.equal(cardBody.serverInfo.websiteUrl, 'https://www.vulnify.io');
@@ -228,7 +228,7 @@ describe('HTTP server', () => {
     const resources = await client.listResources();
     assert.deepEqual(
       prompts.prompts.map((prompt) => prompt.name).sort(),
-      ['guard_action', 'review_policies'],
+      ['guard_action', 'review_policies', 'vulnify_quickstart'],
     );
     assert.equal(resources.resources[0]?.uri, 'vulnify://docs/decisions');
     assert.equal(client.getServerVersion()?.websiteUrl, 'https://www.vulnify.io');
